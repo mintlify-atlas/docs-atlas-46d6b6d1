@@ -1,0 +1,114 @@
+{
+  "projectType": "frontend",
+  "projectName": "Aradia Audiobooks",
+  "projectDescription": "A free, open-source Flutter mobile app for browsing, downloading, and listening to 20,000+ public domain audiobooks from Librivox.",
+  "theme": "almond",
+  "primaryColor": "#FF6B35",
+  "lightColor": "#FFA07A",
+  "darkColor": "#CC5528",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/audiobook-library",
+              "features/audio-player",
+              "features/downloads",
+              "features/youtube-import",
+              "features/local-audiobooks",
+              "features/search-browse"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guide/browsing-audiobooks",
+              "guide/playing-audiobooks",
+              "guide/downloading-for-offline",
+              "guide/managing-favorites",
+              "guide/language-settings"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/architecture",
+              "development/building-from-source",
+              "development/contributing",
+              "development/state-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Models",
+            "pages": [
+              "api/models/audiobook",
+              "api/models/audiobook-file",
+              "api/models/local-audiobook"
+            ]
+          },
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/archive-api",
+              "api/services/audio-handler",
+              "api/services/download-manager",
+              "api/services/youtube-service"
+            ]
+          },
+          {
+            "group": "Screens",
+            "pages": [
+              "api/screens/home",
+              "api/screens/audiobook-details",
+              "api/screens/audiobook-player",
+              "api/screens/search"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Access to 20,000+ free audiobooks from Librivox",
+    "Offline downloads with progress tracking",
+    "Advanced audio player with speed control, skip silence, and sleep timer",
+    "YouTube video import as audiobooks",
+    "Local audiobook file imports",
+    "Multi-language support (20+ languages)",
+    "Genre-based browsing and smart search",
+    "Chromecast support for streaming",
+    "Favorites and wishlist management",
+    "Playback history tracking"
+  ],
+  "publicApiSurface": [
+    "ArchiveApi.fetchAudiobooks()",
+    "ArchiveApi.fetchGenreAudiobooks()",
+    "ArchiveApi.searchAudiobooks()",
+    "DownloadManager.downloadAudiobook()",
+    "DownloadManager.cancelDownload()",
+    "DownloadManager.isDownloaded()",
+    "AudioHandlerProvider",
+    "MyAudioHandler",
+    "YoutubeAudioService",
+    "LocalAudiobookService",
+    "Audiobook.fromJson()",
+    "AudiobookFile",
+    "ChromeCastService"
+  ]
+}
