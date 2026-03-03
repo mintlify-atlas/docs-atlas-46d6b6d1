@@ -80,7 +80,9 @@
               "api/services/archive-api",
               "api/services/audio-handler",
               "api/services/download-manager",
-              "api/services/youtube-service"
+              "api/services/youtube-service",
+              "api/services/chromecast-service",
+              "api/services/local-audiobook-service"
             ]
           },
           {

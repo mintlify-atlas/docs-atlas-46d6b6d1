@@ -1,0 +1,296 @@
+---
+title: LocalAudiobookService
+description: Service for managing local audiobook imports with Storage Access Framework (SAF) integration
+---
+
+## Overview
+
+`LocalAudiobookService` manages the import, storage, and organization of local audiobook files on Android devices using the Storage Access Framework (SAF). It provides automatic metadata extraction, cover art detection, and smart caching for efficient file scanning.
+
+**File:** `lib/resources/services/local/local_audiobook_service.dart`
+
+## Storage Configuration
+
+### getRootFolderPath()
+
+Gets the configured root folder path for local audiobooks.
+
+**Returns:** `Future<String?>`
+
+```dart
+final rootPath = await LocalAudiobookService.getRootFolderPath();
+if (rootPath != null) {
+  print('Audiobooks folder: $rootPath');
+}
+```
+
+### setRootFolderPath()
+
+Sets the root folder path where local audiobooks are stored.
+
+<ParamField path="path" type="String" required>
+  The SAF URI path to the audiobooks folder
+</ParamField>
+
+```dart
+// User selects folder via SAF
+final uri = await Saf.openDocumentTree();
+if (uri != null) {
+  await LocalAudiobookService.setRootFolderPath(uri);
+}
+```
+
+## Audiobook Management
+
+### getAllAudiobooks()
+
+Retrieves all locally imported audiobooks from Hive storage.
+
+**Returns:** `Future<List<LocalAudiobook>>`
+
+```dart
+final audiobooks = await LocalAudiobookService.getAllAudiobooks();
+print('Found ${audiobooks.length} local audiobooks');
+```
+
+### saveAudiobook()
+
+Saves a local audiobook to Hive storage.
+
+<ParamField path="audiobook" type="LocalAudiobook" required>
+  The audiobook to save
+</ParamField>
+
+```dart
+await LocalAudiobookService.saveAudiobook(localAudiobook);
+```
+
+### updateAudiobook()
+
+Updates an existing local audiobook in storage.
+
+<ParamField path="audiobook" type="LocalAudiobook" required>
+  The audiobook to update
+</ParamField>
+
+```dart
+final updated = audiobook.copyWith(rating: 5);
+await LocalAudiobookService.updateAudiobook(updated);
+```
+
+### deleteAudiobook()
+
+Removes a local audiobook from storage.
+
+<ParamField path="audiobook" type="LocalAudiobook" required>
+  The audiobook to delete
+</ParamField>
+
+```dart
+await LocalAudiobookService.deleteAudiobook(audiobook);
+```
+
+## Scanning & Caching
+
+### scanForAudiobooks()
+
+Performs a full scan of the root folder to discover audiobooks. This method:
+
+1. Scans all audio files in the root folder
+2. Organizes files into 3 levels (standalone files, folders, author/book structure)
+3. Extracts metadata from ID3 tags
+4. Searches for cover art (file match, folder search, embedded art)
+
+**Returns:** `Future<List<LocalAudiobook>>`
+
+```dart
+final audiobooks = await LocalAudiobookService.scanForAudiobooks();
+print('Discovered ${audiobooks.length} audiobooks');
+```
+
+<Note>
+The scanner supports three folder organization levels:
+- **Level 0**: Standalone audio files in the root
+- **Level 1**: One folder per audiobook
+- **Level 2**: Author folders containing book folders
+</Note>
+
+### refreshAudiobooks()
+
+Performs a full rescan and replaces all cached audiobooks.
+
+**Returns:** `Future<List<LocalAudiobook>>`
+
+```dart
+// Force a complete refresh
+final audiobooks = await LocalAudiobookService.refreshAudiobooks();
+```
+
+<Warning>
+This clears the entire audiobook cache and rescans everything. Use `smartRefreshAudiobooks()` for better performance.
+</Warning>
+
+### smartRefreshAudiobooks()
+
+Intelligently refreshes audiobooks by only processing changed files.
+
+**Returns:** `Future<List<LocalAudiobook>>`
+
+**How it works:**
+1. Compares current files with cached file list
+2. Identifies new, deleted, and modified files
+3. Only processes affected audiobooks
+4. Returns cached audiobooks if no changes detected
+
+```dart
+// Efficient incremental update
+final audiobooks = await LocalAudiobookService.smartRefreshAudiobooks();
+```
+
+<Tip>
+Use this method for regular refreshes. It caches file paths and only rescans when changes are detected, making it much faster than a full refresh.
+</Tip>
+
+## Cache Management
+
+### getLastScannedFiles()
+
+Gets the list of file paths from the last scan.
+
+**Returns:** `Future<List<String>?>`
+
+```dart
+final cachedFiles = await LocalAudiobookService.getLastScannedFiles();
+if (cachedFiles != null) {
+  print('Cache contains ${cachedFiles.length} files');
+}
+```
+
+### saveScannedFiles()
+
+Saves the list of scanned file paths to cache.
+
+<ParamField path="files" type="List<String>" required>
+  List of file paths to cache
+</ParamField>
+
+```dart
+await LocalAudiobookService.saveScannedFiles(filePaths);
+```
+
+### clearFileCache()
+
+Clears the cached file list. Useful when changing the root folder.
+
+```dart
+await LocalAudiobookService.clearFileCache();
+```
+
+### clearAllCaches()
+
+Clears both the file cache and all audiobook data.
+
+```dart
+// Complete reset
+await LocalAudiobookService.clearAllCaches();
+```
+
+<Warning>
+This removes all local audiobook data. Use when changing the root folder or resetting the app.
+</Warning>
+
+## Metadata Extraction
+
+The service automatically extracts metadata from audio files:
+
+**ID3 Tags:**
+- Title
+- Artist/Author
+- Album
+- Genre
+- Track number
+- Duration
+
+**Cover Art Detection (3 strategies):**
+1. **File Match**: Looks for `cover.jpg`, `folder.jpg`, `artwork.jpg` in the same folder
+2. **Folder Search**: Scans all images in the folder
+3. **Embedded Art**: Extracts embedded album art from ID3 tags
+
+## File Organization Levels
+
+### Level 0: Standalone Files
+```
+/Audiobooks/
+  book1.mp3
+  book2.mp3
+```
+
+Each file becomes a single-chapter audiobook.
+
+### Level 1: Folder per Book
+```
+/Audiobooks/
+  /Pride and Prejudice/
+    chapter1.mp3
+    chapter2.mp3
+    cover.jpg
+```
+
+Folder name becomes the title, files are ordered chapters.
+
+### Level 2: Author/Book Structure
+```
+/Audiobooks/
+  /Jane Austen/
+    /Pride and Prejudice/
+      chapter1.mp3
+      chapter2.mp3
+```
+
+Parent folder is the author, subfolder is the book title.
+
+## Usage Example
+
+```dart
+// Initial setup
+final uri = await Saf.openDocumentTree();
+if (uri != null) {
+  await LocalAudiobookService.setRootFolderPath(uri);
+  
+  // Perform initial scan
+  final audiobooks = await LocalAudiobookService.scanForAudiobooks();
+  
+  // Save to cache
+  for (final audiobook in audiobooks) {
+    await LocalAudiobookService.saveAudiobook(audiobook);
+  }
+  
+  print('Imported ${audiobooks.length} audiobooks');
+}
+
+// Later: Smart refresh to detect changes
+final updated = await LocalAudiobookService.smartRefreshAudiobooks();
+print('Refreshed ${updated.length} audiobooks');
+
+// Get all audiobooks
+final all = await LocalAudiobookService.getAllAudiobooks();
+
+// Update a specific audiobook
+if (all.isNotEmpty) {
+  final first = all.first.copyWith(rating: 5);
+  await LocalAudiobookService.updateAudiobook(first);
+}
+```
+
+## Storage Backend
+
+The service uses **Hive** for local storage with two boxes:
+
+- `local_audiobooks`: Stores audiobook metadata
+- `local_audiobooks_file_cache`: Caches file paths for change detection
+
+## Related
+
+- [LocalAudiobook Model](/api/models/local-audiobook) - Data structure for local audiobooks
+- [AudiobookFile](/api/models/audiobook-file) - Audio file representation
+- [Local Audiobooks Feature](/features/local-audiobooks) - User guide for importing local files

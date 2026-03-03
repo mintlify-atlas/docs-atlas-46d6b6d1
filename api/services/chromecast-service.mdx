@@ -1,0 +1,274 @@
+---
+title: ChromeCastService
+description: Service for managing ChromeCast device discovery, connection, and media playback
+---
+
+## Overview
+
+`ChromeCastService` is a singleton service that manages ChromeCast device discovery, connection handling, and remote media playback for Aradia Audiobooks. It provides a Flutter interface to the `flutter_chrome_cast` plugin.
+
+**File:** `lib/resources/services/chromecast_service.dart`
+
+## Initialization
+
+### initialize()
+
+Initializes the ChromeCast service with default Google Cast settings.
+
+```dart
+final chromeCastService = ChromeCastService();
+await chromeCastService.initialize();
+```
+
+<Note>
+This should be called once during app startup (typically in `main.dart`). Subsequent calls are ignored.
+</Note>
+
+## Device Discovery
+
+### startDiscovery()
+
+Starts scanning for available ChromeCast devices on the local network.
+
+```dart
+chromeCastService.startDiscovery();
+```
+
+### stopDiscovery()
+
+Stops the device discovery process.
+
+```dart
+chromeCastService.stopDiscovery();
+```
+
+### devicesStream
+
+Stream of discovered ChromeCast devices.
+
+**Returns:** `Stream<List<GoogleCastDevice>>`
+
+```dart
+chromeCastService.devicesStream.listen((devices) {
+  for (final device in devices) {
+    print('Found: ${device.friendlyName}');
+  }
+});
+```
+
+## Connection Management
+
+### connectToDevice()
+
+Connects to a specific ChromeCast device.
+
+<ParamField path="device" type="GoogleCastDevice" required>
+  The ChromeCast device to connect to
+</ParamField>
+
+```dart
+final device = devices.first;
+await chromeCastService.connectToDevice(device);
+```
+
+### disconnect()
+
+Ends the current ChromeCast session and stops casting.
+
+```dart
+await chromeCastService.disconnect();
+```
+
+### isConnected
+
+Check if currently connected to a ChromeCast device.
+
+**Returns:** `bool`
+
+```dart
+if (chromeCastService.isConnected) {
+  print('ChromeCast is active');
+}
+```
+
+### sessionStream
+
+Stream of ChromeCast session state changes.
+
+**Returns:** `Stream<GoogleCastSession?>`
+
+```dart
+chromeCastService.sessionStream.listen((session) {
+  if (session != null) {
+    print('ChromeCast session active');
+  }
+});
+```
+
+## Media Playback
+
+### loadAudiobook()
+
+Loads an audiobook into the ChromeCast queue and starts playback.
+
+<ParamField path="audiobook" type="Audiobook" required>
+  The audiobook to play
+</ParamField>
+
+<ParamField path="files" type="List<AudiobookFile>" required>
+  List of audio files to queue
+</ParamField>
+
+<ParamField path="startIndex" type="int" required>
+  Index of the file to start playing
+</ParamField>
+
+<ParamField path="startPosition" type="Duration" required>
+  Position within the file to start playback
+</ParamField>
+
+```dart
+await chromeCastService.loadAudiobook(
+  audiobook,
+  audioFiles,
+  0,  // Start from first file
+  Duration.zero,  // Start from beginning
+);
+```
+
+<Note>
+The service automatically creates a queue with metadata including title, author, and cover art for each audio file.
+</Note>
+
+### Playback Controls
+
+**play()**
+
+Resumes playback on the ChromeCast device.
+
+```dart
+await chromeCastService.play();
+```
+
+**pause()**
+
+Pauses playback on the ChromeCast device.
+
+```dart
+await chromeCastService.pause();
+```
+
+**stop()**
+
+Stops playback and clears the media queue.
+
+```dart
+await chromeCastService.stop();
+```
+
+**seek()**
+
+Seeks to a specific position in the current track.
+
+<ParamField path="position" type="Duration" required>
+  The position to seek to
+</ParamField>
+
+```dart
+await chromeCastService.seek(Duration(minutes: 5));
+```
+
+**skipToNext()**
+
+Skips to the next item in the queue.
+
+```dart
+await chromeCastService.skipToNext();
+```
+
+**skipToPrevious()**
+
+Skips to the previous item in the queue.
+
+```dart
+await chromeCastService.skipToPrevious();
+```
+
+## Media Status Monitoring
+
+### mediaStatusStream
+
+Stream of media playback status updates.
+
+**Returns:** `Stream<GoggleCastMediaStatus?>`
+
+```dart
+chromeCastService.mediaStatusStream.listen((status) {
+  if (status != null) {
+    print('Playback state: ${status.playerState}');
+  }
+});
+```
+
+### currentPosition
+
+Get the current playback position.
+
+**Returns:** `Duration`
+
+```dart
+final position = chromeCastService.currentPosition;
+print('Currently at: ${position.inSeconds}s');
+```
+
+## Cleanup
+
+### dispose()
+
+Cancels all subscriptions and stops device discovery. Call when the service is no longer needed.
+
+```dart
+chromeCastService.dispose();
+```
+
+## Integration Example
+
+```dart
+// Initialize ChromeCast
+final chromeCastService = ChromeCastService();
+await chromeCastService.initialize();
+
+// Start discovering devices
+chromeCastService.startDiscovery();
+
+// Listen for devices
+chromeCastService.devicesStream.listen((devices) {
+  if (devices.isNotEmpty) {
+    // Connect to first device
+    chromeCastService.connectToDevice(devices.first);
+  }
+});
+
+// Monitor connection state
+chromeCastService.sessionStream.listen((session) {
+  if (session != null) {
+    // Load audiobook when connected
+    chromeCastService.loadAudiobook(
+      audiobook,
+      audioFiles,
+      0,
+      Duration.zero,
+    );
+  }
+});
+
+// Monitor playback
+chromeCastService.mediaStatusStream.listen((status) {
+  print('ChromeCast status: ${status?.playerState}');
+});
+```
+
+## Related
+
+- [MyAudioHandler](/api/services/audio-handler) - Integrates with ChromeCast for unified playback control
+- [Audiobook Player Screen](/api/screens/audiobook-player) - UI for ChromeCast controls
