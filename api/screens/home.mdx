@@ -1,0 +1,281 @@
+---
+title: 'Home Screen'
+description: 'Main landing screen displaying audiobook collections and recommendations'
+---
+
+## Overview
+
+The `Home` screen is the main landing page of the Aradia Audiobooks app. It displays various audiobook collections including recently played, local imports, YouTube imports, favorites, personalized recommendations, popular audiobooks, trending titles, and browsable genres.
+
+**File Location**: `lib/screens/home/home.dart`
+
+## Purpose and Functionality
+
+The Home screen serves as the central hub for audiobook discovery and access:
+
+- Displays personalized recommendations based on listening history
+- Shows recently played audiobooks for quick resume
+- Provides access to local and YouTube imported content
+- Lists popular and trending audiobooks from LibriVox
+- Offers genre-based browsing
+- Checks for app updates on initialization
+- Manages theme settings via app bar actions
+
+## Key Components
+
+### State Management
+
+The screen uses **multiple HomeBloc instances** to manage different audiobook collections:
+
+```dart
+late final HomeBloc _popularBloc;
+late final HomeBloc _trendingBloc;
+late final HomeBloc _recommendedBloc;
+```
+
+Each bloc independently fetches and manages its respective audiobook list, preventing unnecessary rebuilds when one section updates.
+
+### Services
+
+- **RecommendationService**: Generates personalized genre recommendations
+- **LatestVersionFetch**: Checks for and downloads app updates
+- **PermissionHelper**: Handles update installation permissions
+
+### Scroll Controllers
+
+Separate scroll controllers for each horizontal audiobook section:
+
+```dart
+late final ScrollController _popularCtrl;
+late final ScrollController _trendingCtrl;
+late final ScrollController _recommendedCtrl;
+```
+
+## Widget Structure
+
+The screen uses a `CustomScrollView` with `SliverToBoxAdapter` sections:
+
+1. **WelcomeSection** - Greeting and user information
+2. **HistorySection** - Recently played audiobooks (max height: 290)
+3. **LocalImportsSection** - Locally imported audiobooks
+4. **YoutubeImportsSection** - YouTube imported content
+5. **FavouriteSection** - User's favorite audiobooks
+6. **Recommended Section** - Personalized recommendations (FutureBuilder)
+7. **MyAudiobooks (Popular)** - Popular all-time audiobooks
+8. **MyAudiobooks (Trending)** - Trending this week
+9. **GenreGrid** - Browse genres section
+10. **Footer** - Search guidance text
+
+## BLoC Events
+
+The Home screen works with `HomeBloc` which handles these events:
+
+### FetchLatestAudiobooks
+```dart
+FetchLatestAudiobooks(page, rows)
+```
+Fetches the latest audiobooks with pagination.
+
+### FetchPopularAudiobooks
+```dart
+FetchPopularAudiobooks(page, rows)
+```
+Fetches all-time popular audiobooks (most downloaded ever).
+
+### FetchPopularThisWeekAudiobooks
+```dart
+FetchPopularThisWeekAudiobooks(page, rows)
+```
+Fetches trending audiobooks for the current week (most viewed weekly).
+
+### FetchAudiobooksByGenre
+```dart
+FetchAudiobooksByGenre(page, rows, genre, sortBy)
+```
+Fetches audiobooks filtered by genre with custom sorting.
+
+### ResetHomeLists
+```dart
+ResetHomeLists()
+```
+Resets all audiobook lists and re-fetches data (used when language preferences change).
+
+## BLoC States
+
+The `HomeBloc` emits these states:
+
+### Loading States
+- `HomeInitial` - Initial state
+- `LatestAudiobooksFetchingLoadingState`
+- `PopularAudiobooksFetchingLoadingState`
+- `PopularAudiobooksOfWeekFetchingLoadingState`
+- `GenreAudiobooksFetchingLoadingState`
+
+### Success States
+- `LatestAudiobooksFetchingSuccessState(audiobooks)` - Contains fetched latest audiobooks
+- `PopularAudiobooksFetchingSuccessState(audiobooks)` - Contains popular audiobooks
+- `PopularAudiobooksOfWeekFetchingSuccessState(audiobooks)` - Contains trending audiobooks
+- `GenreAudiobooksFetchingSuccessState(audiobooks)` - Contains genre-filtered audiobooks
+
+### Failure States
+- `LatestAudiobooksFetchingFailedState`
+- `PopularAudiobooksFetchingFailedState`
+- `PopularAudiobooksOfWeekFetchingFailedState`
+- `GenreAudiobooksFetchingFailedState`
+
+## Navigation
+
+The Home screen supports navigation to:
+
+### Settings Screen
+```dart
+context.push('/settings')
+```
+Triggered via app bar actions.
+
+### Genre Audiobooks Screen
+```dart
+context.push('/genre_audiobooks', extra: genreName)
+```
+Navigates to a list of audiobooks for a specific genre.
+
+## Code Examples
+
+### Building Featured Sections
+
+```dart
+Widget _buildFeaturedSections() {
+  return Column(
+    children: [
+      MyAudiobooks(
+        title: 'Popular All Time',
+        homeBloc: _popularBloc,
+        fetchType: AudiobooksFetchType.popular,
+        scrollController: _popularCtrl,
+      ),
+      MyAudiobooks(
+        title: 'Trending This Week',
+        homeBloc: _trendingBloc,
+        fetchType: AudiobooksFetchType.popularOfWeek,
+        scrollController: _trendingCtrl,
+      ),
+    ],
+  );
+}
+```
+
+### Lazy Load Recommended Section
+
+```dart
+Widget _buildLazyLoadSection(
+    BuildContext context, String title, String genre) {
+  return MyAudiobooks(
+    title: title,
+    homeBloc: _recommendedBloc,
+    fetchType: AudiobooksFetchType.genre,
+    genre: genre,
+    scrollController: _recommendedCtrl,
+    autoFetch: true,
+  );
+}
+```
+
+### Update Check Flow
+
+```dart
+Future<void> _checkForUpdates() async {
+  final result = await _latestVersionFetch.getLatestVersion();
+
+  result.fold(
+    (error) => AppLogger.debug(error),
+    (latestVersionModel) async {
+      if (latestVersionModel.latestVersion != null &&
+          latestVersionModel.latestVersion!.compareTo(currentVersion) > 0) {
+        await _handleUpdateAvailable(latestVersionModel);
+      }
+    },
+  );
+}
+```
+
+### Displaying Recommended Genres
+
+```dart
+FutureBuilder<String>(
+  future: _recommendedGenresFuture,
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.done &&
+        snapshot.hasData &&
+        snapshot.data != null &&
+        snapshot.data!.isNotEmpty) {
+      return _buildLazyLoadSection(
+        context,
+        'Recommended for you',
+        snapshot.data!,
+      );
+    }
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: CircularProgressIndicator(
+          color: AppColors.primaryColor,
+        ),
+      ),
+    );
+  },
+)
+```
+
+## Lifecycle Management
+
+### Initialization
+
+```dart
+@override
+void initState() {
+  super.initState();
+
+  _recommendationService = RecommendationService();
+  _recommendedGenresFuture = _recommendationService
+      .getRecommendedGenres()
+      .then((genres) => genres.map((g) => '"$g"').join(' OR '));
+
+  _popularBloc = HomeBloc();
+  _trendingBloc = HomeBloc();
+  _recommendedBloc = HomeBloc();
+
+  _popularCtrl = ScrollController();
+  _trendingCtrl = ScrollController();
+  _recommendedCtrl = ScrollController();
+
+  _checkForUpdates();
+}
+```
+
+### Disposal
+
+```dart
+@override
+void dispose() {
+  _popularBloc.close();
+  _trendingBloc.close();
+  _recommendedBloc.close();
+
+  _popularCtrl.dispose();
+  _trendingCtrl.dispose();
+  _recommendedCtrl.dispose();
+  super.dispose();
+}
+```
+
+## Dependencies
+
+- `flutter_bloc` - State management
+- `provider` - Dependency injection and theme management
+- `go_router` - Navigation
+- `google_fonts` - Typography (Ubuntu font family)
+- `hive` - Local storage for recommendations and favorites
+
+## Constants
+
+The screen references `HomeConstants.genres` for the genre grid, which contains predefined audiobook genres available for browsing.

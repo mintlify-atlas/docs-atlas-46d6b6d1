@@ -1,0 +1,378 @@
+---
+title: 'Offline Downloads'
+description: 'Download audiobooks for offline listening with real-time progress tracking'
+icon: 'download'
+---
+
+## Overview
+
+Aradia supports downloading audiobooks from Archive.org and YouTube for offline playback. The download system handles large files efficiently with progress tracking, pause/resume capabilities, and automatic error recovery.
+
+## Download Features
+
+<CardGroup cols={2}>
+  <Card title="Background Downloads" icon="cloud-arrow-down">
+    Downloads continue even when the app is closed
+  </Card>
+  <Card title="Progress Tracking" icon="chart-line">
+    Real-time progress updates for each file
+  </Card>
+  <Card title="Pause/Resume" icon="pause">
+    Pause and resume downloads at any time
+  </Card>
+  <Card title="Smart Chunking" icon="layer-group">
+    Handles large files with intelligent chunking
+  </Card>
+</CardGroup>
+
+## Download Manager
+
+The `DownloadManager` class handles all download operations:
+
+<CodeGroup>
+```dart Download Manager Setup (download_manager.dart:10-19)
+class DownloadManager {
+  static final DownloadManager _instance = DownloadManager._internal();
+  factory DownloadManager() => _instance;
+  DownloadManager._internal();
+
+  final FileDownloader _downloader = FileDownloader();
+  final Box<dynamic> downloadStatusBox = Hive.box('download_status_box');
+  final Map<String, bool> _activeDownloads = {};
+
+  static const int _veryLargeFileThresholdBytes = 50 * 1024 * 1024;
+}
+```
+</CodeGroup>
+
+### Permission Handling
+
+<Steps>
+  <Step title="Check Permissions">
+    Request storage and notification permissions before downloading:
+    
+    ```dart Permission Check (download_manager.dart:21-23)
+    Future<bool> checkAndRequestPermissions() async {
+      return await PermissionHelper.requestDownloadPermissions();
+    }
+    ```
+  </Step>
+  
+  <Step title="Configure Notifications">
+    Set up download notifications (if permissions granted):
+    
+    ```dart Notification Config (download_manager.dart:42-53)
+    if (hasNotificationPermission) {
+      _downloader.configureNotification(
+        running: TaskNotification(
+          'Downloading $audiobookTitle', 
+          'File: {filename}'
+        ),
+        progressBar: true,
+        complete: TaskNotification(
+          'Download complete: $audiobookTitle', 
+          'File: {filename}'
+        ),
+        error: TaskNotification(
+          'Download error: $audiobookTitle', 
+          'File: {filename}'
+        ),
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Download Process
+
+### Archive.org Downloads
+
+Standard HTTP downloads with progress tracking:
+
+<CodeGroup>
+```dart Direct Download (download_manager.dart:188-226)
+DownloadTask task = DownloadTask(
+  taskId: uniqueFileTaskId,
+  url: url,
+  filename: fileName,
+  directory: currentFileDirectoryPath,
+  baseDirectory: BaseDirectory.applicationDocuments,
+  updates: Updates.statusAndProgress,
+  allowPause: true,
+);
+
+await _downloader.download(task, onProgress: (progress) {
+  if (_activeDownloads[audiobookId] != true) {
+    _downloader.cancelTaskWithId(task.taskId);
+    throw Exception('Download cancelled');
+  }
+  
+  totalProgress = (completedFiles + progress) / totalFiles;
+  onProgressUpdate(totalProgress);
+  
+  downloadStatusBox.put('status_$audiobookId', {
+    'isDownloading': true,
+    'progress': totalProgress,
+    'isCompleted': false,
+    'audiobookTitle': audiobookTitle,
+    'audiobookId': audiobookId,
+    'isYouTube': false,
+  });
+});
+```
+</CodeGroup>
+
+### YouTube Downloads
+
+YouTube downloads use the `youtube_explode_dart` package with adaptive streaming:
+
+<CodeGroup>
+```dart YouTube Download (download_manager.dart:92-163)
+if (isYouTubeUrl) {
+  // Parse video ID from URL
+  String? parsedVideoId = Uri.parse(url).queryParameters['v'] ??
+      (url.contains('youtu.be/')
+          ? url.split('youtu.be/').last.split('?').first
+          : null);
+
+  // Get audio stream manifest
+  final manifest = await yt.videos.streams.getManifest(
+    parsedVideoId,
+    requireWatchPage: true,
+    ytClients: [YoutubeApiClient.androidVr]
+  );
+
+  // Select best quality MP4 audio stream
+  List<AudioOnlyStreamInfo> mp4AudioStreams = manifest.audioOnly
+      .where((s) => s.container == StreamContainer.mp4)
+      .sortByBitrate()
+      .toList();
+
+  AudioOnlyStreamInfo? audioStreamInfo = mp4AudioStreams.isNotEmpty
+      ? mp4AudioStreams.last
+      : manifest.audioOnly.withHighestBitrate();
+
+  final int totalBytesForFile = audioStreamInfo.size.totalBytes;
+  int receivedBytesForFile = 0;
+
+  // Use chunking for throttled or very large files
+  final bool useChunking = audioStreamInfo.isThrottled ||
+      totalBytesForFile > _veryLargeFileThresholdBytes;
+
+  final stream = audioStreamClient.getAudioStream(
+    audioStreamInfo,
+    start: 0,
+    end: totalBytesForFile,
+    isThrottledOrVeryLarge: useChunking,
+  );
+
+  // Download with progress tracking
+  await for (final data in stream) {
+    if (_activeDownloads[audiobookId] != true) {
+      await fileStream.close();
+      if (await outputFile.exists()) await outputFile.delete();
+      throw Exception('Download cancelled');
+    }
+    fileStream.add(data);
+    receivedBytesForFile += data.length;
+    double fileProgress = totalBytesForFile > 0
+        ? (receivedBytesForFile / totalBytesForFile)
+        : 0.0;
+    totalProgress = (completedFiles + fileProgress) / totalFiles;
+    onProgressUpdate(totalProgress);
+  }
+}
+```
+</CodeGroup>
+
+<Info>
+**Smart Chunking**: Files larger than 50MB or throttled streams use chunked downloading for reliability.
+</Info>
+
+## Progress Tracking
+
+Download status is persisted to Hive for tracking across app restarts:
+
+<CodeGroup>
+```dart Status Tracking (download_manager.dart:62-71)
+await downloadStatusBox.put('status_$audiobookId', {
+  'isDownloading': true,
+  'progress': 0.0,
+  'isCompleted': false,
+  'audiobookTitle': audiobookTitle,
+  'audiobookId': audiobookId,
+  'isYouTube': files.any((f) =>
+      (f['url'] as String).contains('youtube.com') ||
+      (f['url'] as String).contains('youtu.be')),
+});
+```
+</CodeGroup>
+
+### Checking Download Status
+
+<Tabs>
+  <Tab title="Is Downloading">
+    ```dart
+    bool isDownloading(String audiobookId) {
+      final status = downloadStatusBox.get('status_$audiobookId');
+      return _activeDownloads[audiobookId] == true ||
+          (status != null && status['isDownloading'] == true);
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Is Downloaded">
+    ```dart
+    bool isDownloaded(String audiobookId) {
+      final status = downloadStatusBox.get('status_$audiobookId');
+      return status != null && status['isCompleted'] == true;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Get Progress">
+    ```dart
+    double getProgress(String audiobookId) {
+      final status = downloadStatusBox.get('status_$audiobookId');
+      return status != null
+          ? (status['progress'] as num?)?.toDouble() ?? 0.0
+          : 0.0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Pause & Resume
+
+Downloads can be paused and resumed:
+
+<CodeGroup>
+```dart Pause/Resume (download_manager.dart:364-386)
+Future<void> pauseDownload(String uniqueFileTaskId) async {
+  try {
+    final taskJson = downloadStatusBox.get('task_$uniqueFileTaskId');
+    if (taskJson != null) {
+      final task = DownloadTask.fromJson(taskJson as Map<String, dynamic>);
+      await _downloader.pause(task);
+    }
+  } catch (e) {
+    AppLogger.debug('Pause Error: $e');
+  }
+}
+
+Future<void> resumeDownload(String uniqueFileTaskId) async {
+  try {
+    final taskJson = downloadStatusBox.get('task_$uniqueFileTaskId');
+    if (taskJson != null) {
+      final task = DownloadTask.fromJson(taskJson as Map<String, dynamic>);
+      await _downloader.resume(task);
+    }
+  } catch (e) {
+    AppLogger.debug('Resume Error: $e');
+  }
+}
+```
+</CodeGroup>
+
+<Warning>
+**YouTube Downloads**: Pause/resume is not available for YouTube downloads due to stream-based downloading.
+</Warning>
+
+## Cancel Downloads
+
+Cancel ongoing downloads and clean up partial files:
+
+<CodeGroup>
+```dart Cancel Download (download_manager.dart:315-334)
+void cancelDownload(String audiobookId) async {
+  _activeDownloads.remove(audiobookId);
+  
+  // Cancel all associated tasks
+  for (var key in downloadStatusBox.keys.toList()) {
+    if (key.toString().startsWith('task_$audiobookId-')) {
+      final taskJson = downloadStatusBox.get(key);
+      if (taskJson != null) {
+        try {
+          final task = DownloadTask.fromJson(
+            taskJson as Map<String, dynamic>
+          );
+          await _downloader.cancelTaskWithId(task.taskId);
+        } catch (e) {
+          AppLogger.debug('Cancel Error: $e');
+        }
+      }
+      await downloadStatusBox.delete(key);
+    }
+  }
+  
+  // Clean up partial files
+  await _cleanupPartialDownload(audiobookId);
+  await downloadStatusBox.delete('status_$audiobookId');
+}
+```
+</CodeGroup>
+
+### Automatic Cleanup
+
+<CodeGroup>
+```dart Cleanup Partial Downloads (download_manager.dart:303-313)
+Future<void> _cleanupPartialDownload(String audiobookId) async {
+  try {
+    final baseDir = await getExternalStorageDirectory();
+    final downloadDir = Directory('${baseDir?.path}/downloads/$audiobookId');
+    if (await downloadDir.exists()) {
+      await downloadDir.delete(recursive: true);
+    }
+  } catch (e) {
+    AppLogger.debug('Cleanup Error: $e');
+  }
+}
+```
+</CodeGroup>
+
+## Error Handling
+
+Download errors are captured and stored:
+
+<CodeGroup>
+```dart Error Tracking (download_manager.dart:226-241)
+catch (e) {
+  _activeDownloads.remove(audiobookId);
+  await downloadStatusBox.put('status_$audiobookId', {
+    'isDownloading': false,
+    'progress': totalProgress,
+    'isCompleted': false,
+    'error': 'File $fileName: ${e.toString()}',
+    'audiobookTitle': audiobookTitle,
+    'audiobookId': audiobookId,
+    'isYouTube': false,
+  });
+  AppLogger.debug('Direct Download Error: $e');
+  await _cleanupPartialDownload(audiobookId);
+  onCompleted(false);
+  return;
+}
+```
+</CodeGroup>
+
+<Tip>
+Download errors are automatically cleaned up, and you can retry by initiating a new download.
+</Tip>
+
+## Storage Location
+
+<ResponseField name="Archive.org" type="path">
+  `/storage/emulated/0/Android/data/com.example.aradia/files/downloads/{audiobookId}/`
+</ResponseField>
+
+<ResponseField name="YouTube" type="path">
+  `/storage/emulated/0/Android/data/com.example.aradia/files/youtube/{videoId}/`
+</ResponseField>
+
+<Check>
+All downloads are stored in the app's external storage directory and persist until manually deleted.
+</Check>
+
+<Card title="Next Steps" icon="arrow-right" href="/features/youtube-import">
+  Learn how to import audiobooks from YouTube
+</Card>

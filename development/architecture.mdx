@@ -1,0 +1,461 @@
+---
+title: 'App Architecture'
+description: 'Understanding Aradia Audiobooks architecture and design patterns'
+---
+
+## Overview
+
+Aradia Audiobooks is built using **Flutter** with a clean architecture that separates concerns using the **BLoC pattern** for state management and **Provider** for dependency injection. The app follows best practices for scalable mobile applications.
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="Flutter Framework" icon="mobile">
+    Cross-platform mobile framework for Android and iOS
+  </Card>
+  <Card title="BLoC Pattern" icon="diagram-project">
+    Business Logic Component pattern for state management
+  </Card>
+  <Card title="Provider" icon="arrows-down-to-people">
+    Dependency injection and state propagation
+  </Card>
+  <Card title="GoRouter" icon="route">
+    Declarative routing and navigation
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+The codebase is organized into logical layers:
+
+```
+lib/
+├── main.dart                    # App entry point
+├── screens/                     # UI screens
+│   ├── home/                   # Home screen with BLoC
+│   │   ├── home.dart
+│   │   ├── bloc/               # Home BLoC implementation
+│   │   │   ├── home_bloc.dart
+│   │   │   ├── home_event.dart
+│   │   │   └── home_state.dart
+│   │   └── widgets/            # Screen-specific widgets
+│   ├── search/                 # Search screen with BLoC
+│   ├── audiobook_details/      # Details screen
+│   └── audiobook_player/       # Player screen
+├── resources/                   # Data layer
+│   ├── models/                 # Data models
+│   ├── services/               # Business logic services
+│   │   ├── audio_handler_provider.dart
+│   │   ├── chromecast_service.dart
+│   │   └── download/
+│   ├── designs/                # Theme and styling
+│   └── archive_api.dart        # API client
+├── widgets/                     # Reusable widgets
+└── utils/                       # Utilities and helpers
+```
+
+## Core Architectural Patterns
+
+### BLoC Pattern
+
+Aradia uses the BLoC (Business Logic Component) pattern to separate presentation from business logic. Each major screen has its own BLoC:
+
+<CodeGroup>
+```dart lib/screens/search/bloc/search_bloc.dart
+class SearchBloc extends Bloc<SearchEvent, SearchState> {
+  int currentPage = 1;
+  String? lastQuery;
+  StreamSubscription<void>? _langSub;
+
+  SearchBloc() : super(SearchInitial()) {
+    on<EventSearchIconClicked>(_onSearchSubmitted);
+    on<EventLoadMoreResults>(_onLoadMore);
+
+    // Refresh results on language change
+    _langSub = AppEvents.languagesChanged.stream.listen((_) {
+      final q = lastQuery?.trim();
+      if (q != null && q.isNotEmpty) {
+        add(EventSearchIconClicked(q));
+      }
+    });
+  }
+
+  Future<void> _onSearchSubmitted(
+    EventSearchIconClicked event,
+    Emitter<SearchState> emit,
+  ) async {
+    currentPage = 1;
+    lastQuery = event.searchQuery;
+    await _runSearch(emit, query: lastQuery!, page: currentPage, isFresh: true);
+  }
+}
+```
+
+```dart lib/screens/search/bloc/search_event.dart
+@immutable
+sealed class SearchEvent {}
+
+class EventSearchIconClicked extends SearchEvent {
+  final String searchQuery;
+  EventSearchIconClicked(this.searchQuery);
+}
+
+class EventLoadMoreResults extends SearchEvent {
+  final String searchQuery;
+  EventLoadMoreResults(this.searchQuery);
+}
+```
+
+```dart lib/screens/search/bloc/search_state.dart
+@immutable
+sealed class SearchState {}
+
+final class SearchInitial extends SearchState {}
+
+class SearchLoading extends SearchState {}
+
+class SearchSuccess extends SearchState {
+  final List<Audiobook> audiobooks;
+  SearchSuccess(this.audiobooks);
+}
+
+class SearchFailure extends SearchState {
+  final String errorMessage;
+  SearchFailure(this.errorMessage);
+}
+```
+</CodeGroup>
+
+### Provider for Dependency Injection
+
+Provider manages global state and services. Key providers include:
+
+<CodeGroup>
+```dart lib/main.dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await initHive();
+  await AppLogger.initialize();
+
+  final chromeCastService = ChromeCastService();
+  await chromeCastService.initialize();
+
+  final audioHandlerProvider = AudioHandlerProvider();
+  final weSlideController = WeSlideController();
+  final themeNotifier = ThemeNotifier();
+  final youtubeAudiobookNotifier = YoutubeAudiobookNotifier();
+  final webViewKeepAliveProvider = WebViewKeepAliveProvider();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => audioHandlerProvider),
+        ChangeNotifierProvider(create: (_) => weSlideController),
+        ChangeNotifierProvider(create: (_) => themeNotifier),
+        ChangeNotifierProvider(create: (_) => youtubeAudiobookNotifier),
+        ChangeNotifierProvider(create: (_) => webViewKeepAliveProvider),
+      ],
+      child: const MyApp(),
+    ),
+  );
+
+  // Initialize AFTER the first frame so UI shows immediately
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    audioHandlerProvider.initialize();
+  });
+}
+```
+
+```dart lib/resources/services/audio_handler_provider.dart
+class AudioHandlerProvider extends ChangeNotifier {
+  late MyAudioHandler _audioHandler = MyAudioHandler();
+
+  Future<void> initialize() async {
+    _audioHandler = await AudioService.init(
+      builder: () => MyAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.oseamiya.librivoxaudiobook',
+        androidNotificationChannelName: 'Audio playback',
+        androidNotificationOngoing: true,
+      ),
+    );
+    notifyListeners();
+  }
+
+  MyAudioHandler get audioHandler => _audioHandler;
+}
+```
+</CodeGroup>
+
+### GoRouter Navigation
+
+Declarative routing with nested navigation and state preservation:
+
+<CodeGroup>
+```dart lib/main.dart
+GoRouter _buildRouter() {
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: isRecommendScreen == 1 ? '/recommendation_screen' : '/home',
+    routes: [
+      GoRoute(
+        path: '/recommendation_screen',
+        name: 'recommendation_screen',
+        builder: (context, state) => const RecommendationScreen(),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            ScaffoldWithNavBar(navigationShell),
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _sectionNavigatorKey,
+            routes: [
+              GoRoute(
+                path: '/home',
+                name: 'home',
+                builder: (context, state) => const Home(),
+              ),
+              GoRoute(
+                path: '/audiobook-details',
+                builder: (context, state) {
+                  final extras = state.extra as Map<String, dynamic>;
+                  final audiobook = extras['audiobook'] as Audiobook;
+                  final isDownload = extras['isDownload'] as bool;
+                  final isYoutube = extras['isYoutube'] as bool;
+                  final isLocal = extras['isLocal'] as bool;
+                  return AudiobookDetails(
+                    audiobook: audiobook,
+                    isDownload: isDownload,
+                    isYoutube: isYoutube,
+                    isLocal: isLocal,
+                  );
+                },
+              ),
+              GoRoute(
+                path: '/player',
+                name: 'player',
+                builder: (context, state) => const AudiobookPlayer(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/search',
+                name: 'search',
+                builder: (context, state) => const SearchAudiobook(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/download',
+                name: 'download',
+                builder: (context, state) => const DownloadsPage(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ],
+  );
+}
+```
+</CodeGroup>
+
+### Hive for Local Storage
+
+Hive provides fast, lightweight local storage for offline data:
+
+<CodeGroup>
+```dart lib/main.dart
+Future<void> initHive() async {
+  final documentDir = await getApplicationDocumentsDirectory();
+  await Hive.initFlutter(documentDir.path);
+  
+  await Hive.openBox('favourite_audiobooks_box');
+  await Hive.openBox('download_status_box');
+  await Hive.openBox('playing_audiobook_details_box');
+  await Hive.openBox('theme_mode_box');
+  await Hive.openBox('history_of_audiobook_box');
+  await Hive.openBox('recommened_audiobooks_box');
+  await Hive.openBox('dual_mode_box');
+  await Hive.openBox('language_prefs_box');
+  
+  Box recommendedAudiobooksBox = Hive.box('recommened_audiobooks_box');
+  isRecommendScreen = recommendedAudiobooksBox.isEmpty ? 1 : 0;
+}
+```
+
+```dart lib/resources/designs/theme_notifier.dart
+class ThemeNotifier extends ChangeNotifier {
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
+
+  final Box<dynamic> _themeBox = Hive.box('theme_mode_box');
+
+  ThemeNotifier() {
+    _loadTheme();
+  }
+
+  void _loadTheme() {
+    final saved = _themeBox.get('theme_mode_box', defaultValue: 'system') as String;
+    switch (saved) {
+      case 'light':
+        _themeMode = ThemeMode.light;
+        break;
+      case 'dark':
+        _themeMode = ThemeMode.dark;
+        break;
+      default:
+        _themeMode = ThemeMode.system;
+    }
+    notifyListeners();
+  }
+
+  void setTheme(ThemeMode mode) {
+    _themeMode = mode;
+    final value = switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      _ => 'system',
+    };
+    _themeBox.put('theme_mode_box', value);
+    notifyListeners();
+  }
+}
+```
+</CodeGroup>
+
+## Data Models
+
+The app uses well-structured data models for type safety:
+
+<CodeGroup>
+```dart lib/resources/models/audiobook.dart
+class Audiobook {
+  final String title;
+  final String id;
+  final String? description;
+  final String? totalTime;
+  final String? author;
+  final DateTime? date;
+  final int? downloads;
+  final List<dynamic>? subject;
+  final int? size;
+  final double? rating;
+  final int? reviews;
+  final String lowQCoverImage;
+  final String? language;
+  final String? origin;
+
+  Audiobook.fromJson(Map jsonAudiobook)
+      : id = jsonAudiobook["identifier"] ?? '',
+        title = jsonAudiobook["title"] ?? '',
+        totalTime = jsonAudiobook["runtime"],
+        author = jsonAudiobook["creator"] ?? 'Unknown',
+        date = jsonAudiobook['date'] != null
+            ? DateTime.parse(jsonAudiobook["date"])
+            : null,
+        downloads = jsonAudiobook["downloads"] ?? 0,
+        subject = jsonAudiobook["subject"] == null
+            ? []
+            : jsonAudiobook["subject"] is String
+                ? [jsonAudiobook["subject"]]
+                : (jsonAudiobook["subject"] as List)
+                    .where((s) => !["librivox", "audiobooks", "audiobook"]
+                        .contains(s.toLowerCase()))
+                    .toList(),
+        size = jsonAudiobook["item_size"] ?? 0,
+        rating = jsonAudiobook["avg_rating"] != null
+            ? double.parse(jsonAudiobook["avg_rating"].toString())
+            : null,
+        reviews = jsonAudiobook["num_reviews"] ?? 0,
+        description = jsonAudiobook["description"] ?? '',
+        language = jsonAudiobook["language"] ?? 'en',
+        lowQCoverImage =
+            "https://archive.org/services/get-item-image.php?identifier=${jsonAudiobook['identifier']}",
+        origin = "librivox";
+
+  Map<String, dynamic> toJson() {
+    return {
+      "title": title,
+      "id": id,
+      "description": description,
+      "totalTime": totalTime,
+      "author": author,
+      "date": date?.toIso8601String(),
+      "downloads": downloads,
+      "subject": subject,
+      "size": size,
+      "rating": rating,
+      "reviews": reviews,
+      "lowQCoverImage": lowQCoverImage,
+      "language": language,
+      "origin": origin,
+    };
+  }
+}
+```
+</CodeGroup>
+
+## Audio Service Integration
+
+Aradia integrates with Android's audio service for background playback and media controls:
+
+- **Audio Service**: Manages background audio playback
+- **Just Audio**: High-performance audio player
+- **Media Notifications**: System-level playback controls
+- **ChromeCast**: Cast audio to ChromeCast devices
+
+<Note>
+The audio service is initialized after the first frame to ensure the UI loads immediately without blocking.
+</Note>
+
+## Key Design Decisions
+
+<AccordionGroup>
+  <Accordion title="Why BLoC Pattern?">
+    BLoC provides:
+    - Clear separation between UI and business logic
+    - Testable code with predictable state changes
+    - Easy debugging with state transitions
+    - Reactive programming with streams
+  </Accordion>
+
+  <Accordion title="Why Provider + BLoC?">
+    Provider handles global services (audio, theme, settings) while BLoC manages screen-specific business logic. This hybrid approach gives the best of both worlds.
+  </Accordion>
+
+  <Accordion title="Why GoRouter?">
+    GoRouter provides:
+    - Declarative routing configuration
+    - Deep linking support
+    - Nested navigation with state preservation
+    - Type-safe route parameters
+  </Accordion>
+
+  <Accordion title="Why Hive?">
+    Hive is:
+    - Fast and lightweight
+    - No native dependencies
+    - Type-safe with code generation
+    - Perfect for storing favorites, history, and settings
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Building from Source" icon="hammer" href="/development/building-from-source">
+    Set up your development environment
+  </Card>
+  <Card title="State Management" icon="gears" href="/development/state-management">
+    Deep dive into BLoC and Provider usage
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+    Learn how to contribute to the project
+  </Card>
+</CardGroup>

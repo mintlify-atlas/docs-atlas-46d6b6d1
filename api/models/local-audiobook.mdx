@@ -1,0 +1,339 @@
+---
+title: LocalAudiobook
+description: Model representing a locally imported audiobook from the user's device
+---
+
+## Overview
+
+The `LocalAudiobook` class represents an audiobook that has been imported from the user's device storage. Unlike remote audiobooks from LibriVox, these are managed entirely locally and can include user-added metadata.
+
+## Properties
+
+<ResponseField name="title" type="String" required>
+  The title of the audiobook
+</ResponseField>
+
+<ResponseField name="author" type="String" required>
+  The author of the audiobook
+</ResponseField>
+
+<ResponseField name="folderPath" type="String" required>
+  The file system path to the folder containing the audiobook files
+</ResponseField>
+
+<ResponseField name="coverImagePath" type="String?">
+  The file system path to the cover image, if available
+</ResponseField>
+
+<ResponseField name="audioFiles" type="List<String>" required>
+  A list of paths to the audio files that make up this audiobook
+</ResponseField>
+
+<ResponseField name="totalDuration" type="Duration?">
+  The total playback duration of all audio files combined
+</ResponseField>
+
+<ResponseField name="dateAdded" type="DateTime" required>
+  The date and time when this audiobook was added to the library
+</ResponseField>
+
+<ResponseField name="lastModified" type="DateTime" required>
+  The date and time when this audiobook was last modified
+</ResponseField>
+
+<ResponseField name="description" type="String?">
+  A text description of the audiobook
+</ResponseField>
+
+<ResponseField name="genre" type="String?">
+  The genre or category of the audiobook
+</ResponseField>
+
+<ResponseField name="rating" type="double?">
+  User rating for the audiobook
+</ResponseField>
+
+<ResponseField name="id" type="String" required>
+  A unique identifier for the audiobook
+</ResponseField>
+
+## Constructor
+
+### Constructor
+
+Creates a new `LocalAudiobook` instance.
+
+**Parameters:**
+
+<ParamField path="title" type="String" required>
+  The title of the audiobook
+</ParamField>
+
+<ParamField path="author" type="String" required>
+  The author of the audiobook
+</ParamField>
+
+<ParamField path="folderPath" type="String" required>
+  The folder path containing the audiobook files
+</ParamField>
+
+<ParamField path="coverImagePath" type="String?">
+  The path to the cover image
+</ParamField>
+
+<ParamField path="audioFiles" type="List<String>" required>
+  List of audio file paths
+</ParamField>
+
+<ParamField path="totalDuration" type="Duration?">
+  Total duration of the audiobook
+</ParamField>
+
+<ParamField path="dateAdded" type="DateTime" required>
+  When the audiobook was added
+</ParamField>
+
+<ParamField path="lastModified" type="DateTime" required>
+  When the audiobook was last modified
+</ParamField>
+
+<ParamField path="description" type="String?">
+  Description text
+</ParamField>
+
+<ParamField path="genre" type="String?">
+  Genre or category
+</ParamField>
+
+<ParamField path="rating" type="double?">
+  User rating
+</ParamField>
+
+<ParamField path="id" type="String" required>
+  Unique identifier
+</ParamField>
+
+```dart
+LocalAudiobook audiobook = LocalAudiobook(
+  id: "local_123",
+  title: "The Great Gatsby",
+  author: "F. Scott Fitzgerald",
+  folderPath: "/storage/audiobooks/great_gatsby",
+  coverImagePath: "/storage/audiobooks/great_gatsby/cover.jpg",
+  audioFiles: [
+    "/storage/audiobooks/great_gatsby/chapter_01.mp3",
+    "/storage/audiobooks/great_gatsby/chapter_02.mp3",
+  ],
+  totalDuration: Duration(hours: 4, minutes: 30),
+  dateAdded: DateTime.now(),
+  lastModified: DateTime.now(),
+  description: "A classic novel of the Jazz Age",
+  genre: "Fiction",
+  rating: 4.5,
+);
+```
+
+## Getters
+
+### firstAudioFile
+
+Returns the path to the first audio file in the audiobook, or null if there are no audio files.
+
+**Returns:** `String?`
+
+```dart
+String? firstFile = audiobook.firstAudioFile;
+```
+
+### hasCoverImage
+
+Checks whether the audiobook has a cover image.
+
+**Returns:** `bool`
+
+```dart
+if (audiobook.hasCoverImage) {
+  // Display cover image
+}
+```
+
+### formattedDuration
+
+Returns a human-readable string representation of the total duration.
+
+**Returns:** `String`
+
+**Format:**
+- If duration is unknown: "Unknown"
+- If hours > 0: "{hours}h {minutes}m"
+- If hours = 0: "{minutes}m"
+
+```dart
+String duration = audiobook.formattedDuration;
+// Example output: "4h 30m" or "45m"
+```
+
+## Methods
+
+### copyWith
+
+Creates a copy of the audiobook with optionally updated fields.
+
+**Parameters:**
+
+<ParamField path="title" type="String?">
+  Updated title
+</ParamField>
+
+<ParamField path="author" type="String?">
+  Updated author
+</ParamField>
+
+<ParamField path="folderPath" type="String?">
+  Updated folder path
+</ParamField>
+
+<ParamField path="coverImagePath" type="String?">
+  Updated cover image path
+</ParamField>
+
+<ParamField path="audioFiles" type="List<String>?">
+  Updated audio files list
+</ParamField>
+
+<ParamField path="totalDuration" type="Duration?">
+  Updated total duration
+</ParamField>
+
+<ParamField path="dateAdded" type="DateTime?">
+  Updated date added
+</ParamField>
+
+<ParamField path="lastModified" type="DateTime?">
+  Updated last modified date
+</ParamField>
+
+<ParamField path="description" type="String?">
+  Updated description
+</ParamField>
+
+<ParamField path="genre" type="String?">
+  Updated genre
+</ParamField>
+
+<ParamField path="rating" type="double?">
+  Updated rating
+</ParamField>
+
+<ParamField path="id" type="String?">
+  Updated identifier
+</ParamField>
+
+**Returns:** `LocalAudiobook`
+
+```dart
+LocalAudiobook updatedBook = audiobook.copyWith(
+  rating: 5.0,
+  description: "An updated description",
+);
+```
+
+### toMap()
+
+Converts the audiobook to a map suitable for Hive storage.
+
+**Returns:** `Map<String, dynamic>`
+
+**Note:** DateTime values are converted to milliseconds since epoch, and Duration is converted to milliseconds.
+
+```dart
+Map<String, dynamic> map = audiobook.toMap();
+// Can be stored in Hive database
+```
+
+### toString()
+
+Returns a string representation of the audiobook.
+
+**Returns:** `String`
+
+```dart
+print(audiobook.toString());
+// Output: LocalAudiobook(id: local_123, title: The Great Gatsby, author: F. Scott Fitzgerald, folderPath: /storage/audiobooks/great_gatsby)
+```
+
+## Static Methods
+
+### fromMap
+
+Creates a `LocalAudiobook` instance from a map (typically retrieved from Hive storage).
+
+**Parameters:**
+
+<ParamField path="map" type="Map" required>
+  The map containing LocalAudiobook data (Map&lt;String, dynamic&gt;)
+</ParamField>
+
+**Returns:** `LocalAudiobook`
+
+**Note:** Converts milliseconds back to DateTime and Duration objects. Sets default values for missing fields:
+- `id`: Empty string
+- `title`: Empty string
+- `author`: "Unknown"
+- `folderPath`: Empty string
+- `audioFiles`: Empty list
+- `dateAdded`: Epoch (January 1, 1970)
+- `lastModified`: Epoch (January 1, 1970)
+
+```dart
+Map<String, dynamic> map = {
+  'id': 'local_123',
+  'title': 'The Great Gatsby',
+  'author': 'F. Scott Fitzgerald',
+  'folderPath': '/storage/audiobooks/great_gatsby',
+  'audioFiles': ['/storage/audiobooks/great_gatsby/chapter_01.mp3'],
+  'totalDuration': 16200000, // milliseconds
+  'dateAdded': 1640995200000, // milliseconds since epoch
+  'lastModified': 1640995200000,
+  'rating': 4.5
+};
+
+LocalAudiobook audiobook = LocalAudiobook.fromMap(map);
+```
+
+## Usage Example
+
+```dart
+// Create a new local audiobook
+LocalAudiobook audiobook = LocalAudiobook(
+  id: DateTime.now().millisecondsSinceEpoch.toString(),
+  title: "1984",
+  author: "George Orwell",
+  folderPath: "/storage/audiobooks/1984",
+  audioFiles: [
+    "/storage/audiobooks/1984/part1.mp3",
+    "/storage/audiobooks/1984/part2.mp3",
+    "/storage/audiobooks/1984/part3.mp3",
+  ],
+  dateAdded: DateTime.now(),
+  lastModified: DateTime.now(),
+  genre: "Dystopian Fiction",
+);
+
+// Save to Hive
+Map<String, dynamic> audiobookMap = audiobook.toMap();
+// await box.put(audiobook.id, audiobookMap);
+
+// Retrieve from Hive
+// Map<String, dynamic> retrievedMap = await box.get(id);
+// LocalAudiobook retrievedBook = LocalAudiobook.fromMap(retrievedMap);
+
+// Update the audiobook
+LocalAudiobook ratedBook = audiobook.copyWith(
+  rating: 4.8,
+  lastModified: DateTime.now(),
+);
+
+print(ratedBook.formattedDuration); // "Unknown" if duration not set
+print(ratedBook.hasCoverImage); // false
+```

@@ -1,80 +1,356 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start Guide"
+description: "Get started with Aradia in under 5 minutes"
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through installing Aradia, browsing the audiobook library, and playing your first audiobook. By the end, you'll be ready to enjoy 20,000+ free audiobooks on your Android device.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Install Aradia">
+    First, download and install the Aradia APK on your Android device.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    1. Visit the [GitHub Releases page](https://github.com/sagarchaulagai/aradia/releases)
+    2. Download the latest APK (version 3.0.0 or newer)
+    3. Enable "Unknown sources" in your device settings
+    4. Install the APK
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    <Card
+      title="Need detailed installation help?"
+      icon="circle-info"
+      href="/installation"
+    >
+      Check out our comprehensive installation guide for step-by-step instructions and troubleshooting.
+    </Card>
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Tip>
+      Make sure to grant storage and notification permissions when first launching the app.
+    </Tip>
+  </Step>
+  
+  <Step title="Browse Audiobooks">
+    Once installed, explore the extensive library of audiobooks.
+    
+    ### Home Screen Overview
+    
+    When you open Aradia, you'll see:
+    
+    - **Welcome Section** - Featured audiobooks and recommendations
+    - **Genre Grid** - Quick access to 15+ genres
+    - **My Audiobooks** - Your downloaded and favorited titles
+    - **History** - Continue listening where you left off
+    - **YouTube Import** - Add YouTube videos as audiobooks
+    
+    ### Browse by Genre
+    
+    Tap any genre card to explore audiobooks in that category:
+    
+    <CardGroup cols={3}>
+      <Card title="Adventure" icon="compass" />
+      <Card title="Biography" icon="user" />
+      <Card title="Children" icon="child" />
+      <Card title="Comedy" icon="face-laugh" />
+      <Card title="Fantasy" icon="wand-sparkle" />
+      <Card title="Horror" icon="ghost" />
+      <Card title="Mystery" icon="magnifying-glass" />
+      <Card title="Philosophy" icon="brain" />
+      <Card title="Romance" icon="heart" />
+    </CardGroup>
+    
+    ### Search for Specific Titles
+    
+    1. Tap the **search icon** in the top navigation bar
+    2. Enter a title, author, or subject
+    3. Browse the search results
+    
+    <Note>
+      You can search across all 20,000+ audiobooks from the Librivox collection, spanning multiple languages and subjects.
+    </Note>
+  </Step>
+  
+  <Step title="Play Your First Audiobook">
+    Let's listen to an audiobook!
+    
+    ### Select an Audiobook
+    
+    1. Browse or search for an audiobook that interests you
+    2. Tap on the audiobook cover to open the **details page**
+    
+    ### Audiobook Details
+    
+    On the details page, you'll see:
+    
+    - **Cover art** and metadata (title, author, duration)
+    - **Description** of the audiobook content
+    - **Track list** with all chapters/sections
+    - **Play button** to start streaming immediately
+    - **Download button** to save for offline listening
+    - **Favorite button** (heart icon) to add to your wishlist
+    
+    ### Start Streaming
+    
+    Tap the **Play** button to start streaming the audiobook immediately.
+    
+    <Check>
+      The audiobook will begin playing, and you'll see the **mini player** appear at the bottom of the screen.
+    </Check>
+    
+    ### Player Controls
+    
+    Tap the mini player to open the **full player screen** with advanced controls:
+    
+    <Tabs>
+      <Tab title="Basic Controls">
+        - **Play/Pause** - Control playback
+        - **Skip Forward/Back** - Jump 30 seconds (customizable)
+        - **Previous/Next Track** - Navigate between chapters
+        - **Progress Bar** - Seek to any position
+      </Tab>
+      
+      <Tab title="Advanced Features">
+        - **Playback Speed** - Adjust from 0.5x to 3.0x
+        - **Sleep Timer** - Auto-pause after a set duration
+        - **Skip Silence** - Automatically skip long pauses
+        - **Equalizer** - Customize audio settings
+      </Tab>
+      
+      <Tab title="Additional Options">
+        - **Track List** - View and jump to specific chapters
+        - **Characters** - See narrator and character information
+        - **Chromecast** - Cast to TV or smart speakers
+        - **Share** - Share the audiobook with friends
+      </Tab>
+    </Tabs>
+    
+    <Tip>
+      Enable **Skip Silence** for a smoother listening experience, especially for audiobooks with long pauses between chapters.
+    </Tip>
+  </Step>
+  
+  <Step title="Download for Offline Listening">
+    Save audiobooks to your device to listen without internet.
+    
+    ### Download an Audiobook
+    
+    1. Open the audiobook details page
+    2. Tap the **Download** button (download icon)
+    3. The app will start downloading all chapters
+    4. Track download progress in the **Downloads** tab
+    
+    ### Manage Downloads
+    
+    Access your downloads:
+    
+    1. Tap the **hamburger menu** (three lines) in the top-left
+    2. Select **Downloads** from the navigation menu
+    3. View all downloaded audiobooks
+    4. Tap any audiobook to play offline
+    
+    <Warning>
+      Large audiobooks can take significant storage space (500 MB - 2 GB). Make sure you have enough free space before downloading.
+    </Warning>
+    
+    ### Delete Downloads
+    
+    To free up space:
+    
+    1. Long-press on a downloaded audiobook
+    2. Tap **Delete** to remove it from your device
+    3. You can re-download it anytime from the library
+  </Step>
+  
+  <Step title="Add to Favorites">
+    Keep track of audiobooks you love or want to listen to later.
+    
+    ### Add to Wishlist
+    
+    1. Open the audiobook details page
+    2. Tap the **heart icon** to add to favorites
+    3. The heart will turn filled/colored to confirm
+    
+    ### View Favorites
+    
+    1. Go to the **Home** screen
+    2. Scroll to the **Favorites Section**
+    3. All your favorited audiobooks appear here
+    
+    <Tip>
+      Use favorites to create a reading list or bookmark audiobooks you discover while browsing.
+    </Tip>
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Bonus Features
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Now that you know the basics, explore these additional features:
 
-### Step 3: Go live
+### Import YouTube Videos as Audiobooks
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+<Steps>
+  <Step title="Open YouTube Import">
+    Tap the **YouTube Import** section on the home screen.
+  </Step>
+  
+  <Step title="Enter YouTube URL">
+    Paste a YouTube video URL into the input field.
+  </Step>
+  
+  <Step title="Import and Play">
+    Tap **Import** and the video will be added to your library as an audiobook. Perfect for lectures, podcasts, or any audio content on YouTube.
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  YouTube import extracts only the audio from videos, saving bandwidth and battery life.
 </Note>
+
+### Import Local Audiobook Files
+
+Have audiobook files on your device? Import them into Aradia:
+
+1. Tap the **Local Imports** section on the home screen
+2. Select **Import from Files**
+3. Choose audiobook files (MP3, M4A, etc.) from your device
+4. Aradia will automatically organize them with metadata
+
+### Browse Audiobooks by Language
+
+Aradia supports 20+ languages:
+
+1. Open the app **Settings**
+2. Select **Language Filter**
+3. Choose your preferred language
+4. Browse audiobooks in English, German, Spanish, French, Italian, Russian, and more
+
+### Continue Listening Across Devices
+
+Your listening progress is automatically saved:
+
+- **History Section** on the home screen shows recent audiobooks
+- Tap any audiobook to resume exactly where you left off
+- Progress is saved locally on your device
+
+## Tips for the Best Experience
+
+<AccordionGroup>
+  <Accordion title="Optimize Battery Life" icon="battery-full">
+    - Download audiobooks for offline listening instead of streaming
+    - Lower the screen brightness while listening
+    - Use the sleep timer to avoid all-night playback
+  </Accordion>
+  
+  <Accordion title="Improve Audio Quality" icon="volume-high">
+    - Open the full player and tap the **equalizer icon**
+    - Adjust bass, treble, and other settings to your preference
+    - Use headphones or external speakers for better sound
+  </Accordion>
+  
+  <Accordion title="Customize Playback" icon="sliders">
+    - Adjust playback speed (1.25x - 1.5x is popular for faster listening)
+    - Change skip forward/back duration in settings (default: 30 seconds)
+    - Enable skip silence for audiobooks with long pauses
+  </Accordion>
+  
+  <Accordion title="Discover New Content" icon="compass">
+    - Browse the **Recommendations** section for curated picks
+    - Explore different genres you haven't tried
+    - Use the search to find audiobooks by your favorite authors
+    - Check the **New Arrivals** section for recently added titles
+  </Accordion>
+  
+  <Accordion title="Background Playback" icon="mobile">
+    - Audio continues playing when you switch apps
+    - Control playback from the notification shade
+    - Use the lock screen controls without unlocking your device
+    - The mini player persists across all app screens
+  </Accordion>
+</AccordionGroup>
+
+## Keyboard Shortcuts & Gestures
+
+<CardGroup cols={2}>
+  <Card title="Mini Player" icon="music">
+    - Tap to expand full player
+    - Swipe left/right to skip tracks
+    - Visible on all screens for quick access
+  </Card>
+  <Card title="Player Screen" icon="circle-play">
+    - Swipe down to minimize
+    - Tap progress bar to seek
+    - Long-press for precise seeking
+  </Card>
+  <Card title="Audiobook Details" icon="info">
+    - Swipe down to close
+    - Tap tracks to preview
+    - Long-press to see options
+  </Card>
+  <Card title="Genre Grid" icon="grid">
+    - Tap genre to browse
+    - Scroll horizontally for more
+    - Pull to refresh content
+  </Card>
+</CardGroup>
+
+## Common Questions
+
+<AccordionGroup>
+  <Accordion title="Is Aradia really free?" icon="circle-question">
+    Yes! Aradia is 100% free with no ads, no subscriptions, and no hidden costs. All audiobooks are from the public domain via Librivox.
+  </Accordion>
+  
+  <Accordion title="How much storage do audiobooks use?" icon="hard-drive">
+    Audiobook sizes vary:
+    - Short stories: 50-100 MB
+    - Average novels: 200-500 MB
+    - Long classics: 500 MB - 2 GB
+    
+    Check available storage before downloading large audiobooks.
+  </Accordion>
+  
+  <Accordion title="Can I listen without internet?" icon="wifi-slash">
+    Yes! Download audiobooks to your device and listen completely offline. Only browsing and streaming require internet.
+  </Accordion>
+  
+  <Accordion title="How do I report a bug or request a feature?" icon="bug">
+    - Open a GitHub issue: [github.com/sagarchaulagai/aradia/issues](https://github.com/sagarchaulagai/aradia/issues)
+    - Join our Discord community: [discord.gg/QwTxRKC9UF](https://discord.gg/QwTxRKC9UF)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Explore Features"
+    icon="sparkles"
+    href="/features/audiobook-library"
+  >
+    Learn about all the powerful features Aradia offers
+  </Card>
+  <Card
+    title="User Guides"
+    icon="book-open"
+    href="/guide/browsing-audiobooks"
+  >
+    Detailed guides for specific tasks and workflows
+  </Card>
+  <Card
+    title="Player Controls"
+    icon="circle-play"
+    href="/features/audio-player"
+  >
+    Master the advanced audio player features
+  </Card>
+  <Card
+    title="YouTube Import"
+    icon="youtube"
+    href="/features/youtube-import"
+  >
+    Learn how to import YouTube content as audiobooks
+  </Card>
+</CardGroup>
+
+<Check>
+  **Congratulations!** You're now ready to enjoy thousands of free audiobooks with Aradia. Happy listening!
+</Check>

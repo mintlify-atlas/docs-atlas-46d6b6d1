@@ -1,0 +1,200 @@
+---
+title: '20,000+ Audiobook Library'
+description: 'Access a vast collection of public domain audiobooks from LibriVox and Archive.org'
+icon: 'book-open'
+---
+
+## Overview
+
+Aradia Audiobooks provides instant access to over 20,000 free public domain audiobooks through LibriVox and Archive.org. The library includes classics in multiple languages, organized by genre, author, and popularity.
+
+## Library Sources
+
+<CardGroup cols={2}>
+  <Card title="LibriVox Integration" icon="microphone">
+    Thousands of volunteer-narrated audiobooks from the LibriVox collection
+  </Card>
+  <Card title="Archive.org API" icon="database">
+    Direct integration with Archive.org's extensive audiobook catalog
+  </Card>
+</CardGroup>
+
+## Features
+
+### Multi-Language Support
+
+The app supports audiobooks in 20+ languages including:
+
+<CodeGroup>
+```dart Supported Languages
+const Map<String, List<String>> _langAliases = {
+  'en': ['en', 'eng', 'english'],
+  'de': ['de', 'deu', 'ger', 'german'],
+  'es': ['es', 'spa', 'spanish'],
+  'fr': ['fr', 'fra', 'fre', 'french'],
+  'nl': ['nl', 'nld', 'dut', 'dutch'],
+  'pt': ['pt', 'por', 'portuguese'],
+  'it': ['it', 'ita', 'italian'],
+  'ru': ['ru', 'rus', 'russian'],
+  'ja': ['ja', 'jpn', 'japanese'],
+  'zh': ['zh', 'zho', 'chi', 'chinese'],
+  // ... and more
+};
+```
+</CodeGroup>
+
+<Note>
+Language filters are automatically applied to search and browse results based on your preferences.
+</Note>
+
+### Advanced Search & Filtering
+
+The Archive.org API integration uses advanced query building to fetch audiobooks:
+
+<CodeGroup>
+```dart Query Building (archive_api.dart:108-134)
+String _buildAdvancedSearchUrl({
+  required String collection,
+  String extraQuery = '',
+  String sortBy = '',
+  required int page,
+  required int rows,
+}) {
+  final lang = _languageQueryClause();
+  final sort = sortBy.isNotEmpty ? '&sort[]=$sortBy+desc' : '';
+
+  // Build query with collection, language, and extra filters
+  final qParts = <String>[
+    'collection:($collection)',
+  ];
+  if (lang.isNotEmpty) {
+    qParts[0] = '${qParts[0]}$lang';
+  }
+  if (extraQuery.isNotEmpty) {
+    final enc = Uri.encodeComponent(extraQuery);
+    qParts.add('($enc)');
+  }
+  final q = 'q=${qParts.join('+AND+')}';
+
+  return 'https://archive.org/advancedsearch.php?$q&fl=$_fields$sort&output=json&page=$page&rows=$rows';
+}
+```
+</CodeGroup>
+
+### Genre-Based Browsing
+
+Browse audiobooks by genre with intelligent subject mapping:
+
+<AccordionGroup>
+  <Accordion title="Available Genres" icon="masks-theater">
+    - Adventure
+    - Biography
+    - Children's Literature
+    - Comedy & Humor
+    - Crime & Mystery
+    - Fantasy
+    - Horror
+    - Philosophy
+    - Poetry
+    - Religion
+    - Romance
+    - Science Fiction
+    - War & History
+  </Accordion>
+  
+  <Accordion title="Multi-Language Genre Detection" icon="language">
+    The app uses sophisticated regex patterns to detect genres across languages:
+    
+    ```dart Category Filters (archive_api.dart:369-523)
+    final Map<String, List<RegExp>> _categoryFilters = {
+      'war': [
+        // English patterns
+        RegExp(r'\bwar(s)?\b', caseSensitive: false),
+        RegExp(r'\bworld\s*war(s)?\b', caseSensitive: false),
+        // German patterns
+        RegExp(r'\bkrieg(e|en)?\b', caseSensitive: false),
+        // French patterns
+        RegExp(r'\bguerre(s)?\b', caseSensitive: false),
+        // And many more languages...
+      ],
+      // ... other genres
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Smart Caching & Performance
+
+<Tip>
+The library uses HTTP caching with ETags and Last-Modified headers to minimize bandwidth and improve performance.
+</Tip>
+
+<CodeGroup>
+```dart HTTP Cache Implementation (archive_api.dart:14-25)
+class _CacheEntry {
+  final String body;
+  final String? etag;
+  final String? lastModified;
+  final DateTime storedAt;
+  
+  _CacheEntry({
+    required this.body,
+    this.etag,
+    this.lastModified,
+    required this.storedAt,
+  });
+}
+```
+</CodeGroup>
+
+## Library Metadata
+
+Each audiobook includes comprehensive metadata:
+
+<ResponseField name="title" type="string" required>
+  The audiobook title
+</ResponseField>
+
+<ResponseField name="author" type="string">
+  Author or narrator name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Full description of the audiobook content
+</ResponseField>
+
+<ResponseField name="runtime" type="number">
+  Total runtime in seconds
+</ResponseField>
+
+<ResponseField name="rating" type="number">
+  Average user rating
+</ResponseField>
+
+<ResponseField name="subject" type="array">
+  Genre tags and subject categories
+</ResponseField>
+
+<ResponseField name="language" type="string">
+  Primary language of the audiobook
+</ResponseField>
+
+<ResponseField name="downloads" type="number">
+  Number of times downloaded from Archive.org
+</ResponseField>
+
+## API Fields
+
+The following fields are fetched from Archive.org:
+
+```dart
+const _fields = "runtime,avg_rating,num_reviews,title,description,identifier,creator,date,downloads,subject,item_size,language";
+```
+
+<Check>
+**20,000+ audiobooks** available instantly with no account required!
+</Check>
+
+<Card title="Next Steps" icon="arrow-right" href="/features/search-browse">
+  Learn how to search and filter the audiobook library
+</Card>

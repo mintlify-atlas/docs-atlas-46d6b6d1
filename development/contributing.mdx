@@ -1,0 +1,503 @@
+---
+title: 'Contributing Guide'
+description: 'Guidelines for contributing to Aradia Audiobooks'
+---
+
+## Welcome Contributors!
+
+Thank you for your interest in contributing to Aradia Audiobooks! We welcome contributions from developers of all skill levels. Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
+
+## Getting Started
+
+<Steps>
+  <Step title="Fork the Repository">
+    Fork the repository on GitHub:
+    ```bash
+    # Navigate to https://github.com/sagarchaulagai/aradia
+    # Click the "Fork" button
+    ```
+  </Step>
+
+  <Step title="Clone Your Fork">
+    Clone your forked repository:
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/aradia.git
+    cd aradia
+    ```
+  </Step>
+
+  <Step title="Add Upstream Remote">
+    Add the original repository as upstream:
+    ```bash
+    git remote add upstream https://github.com/sagarchaulagai/aradia.git
+    ```
+  </Step>
+
+  <Step title="Set Up Development Environment">
+    Follow the [Building from Source](/development/building-from-source) guide to set up your development environment.
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### Create a Feature Branch
+
+Always create a new branch for your work:
+
+```bash
+# Update your main branch
+git checkout main
+git pull upstream main
+
+# Create a new feature branch
+git checkout -b feature/your-feature-name
+```
+
+<Note>
+Use descriptive branch names:
+- `feature/add-podcast-support`
+- `fix/audio-playback-crash`
+- `docs/update-installation-guide`
+</Note>
+
+### Make Your Changes
+
+<Tabs>
+  <Tab title="Code Changes">
+    <Steps>
+      <Step title="Follow Code Style">
+        Aradia follows standard Dart/Flutter conventions:
+        ```bash
+        # Format your code
+        flutter format .
+        
+        # Analyze code
+        flutter analyze
+        ```
+      </Step>
+
+      <Step title="Write Tests">
+        Add tests for new features:
+        ```dart test/widget_test.dart
+        import 'package:flutter_test/flutter_test.dart';
+        import 'package:aradia/main.dart';
+        
+        void main() {
+          testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+            await tester.pumpWidget(const MyApp());
+            // Add your test logic
+          });
+        }
+        ```
+      </Step>
+
+      <Step title="Test Your Changes">
+        Run the app and verify your changes:
+        ```bash
+        flutter run
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Documentation">
+    <Steps>
+      <Step title="Update Documentation">
+        If your changes affect user-facing features, update the documentation.
+      </Step>
+
+      <Step title="Add Code Comments">
+        Add comments for complex logic:
+        ```dart
+        /// Fetches audiobooks from Archive.org API
+        /// 
+        /// [page] - The page number for pagination
+        /// [rows] - Number of results per page
+        /// Returns Either an error message or list of audiobooks
+        Future<Either<String, List<Audiobook>>> getLatestAudiobook(
+          int page, 
+          int rows
+        ) async {
+          // Implementation
+        }
+        ```
+      </Step>
+
+      <Step title="Update README">
+        If adding major features, update the README.md.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Code Standards
+
+### BLoC Pattern Guidelines
+
+When creating new BLoCs, follow the existing pattern:
+
+<CodeGroup>
+```dart example_bloc.dart
+class ExampleBloc extends Bloc<ExampleEvent, ExampleState> {
+  ExampleBloc() : super(ExampleInitial()) {
+    on<EventName>(_onEventName);
+  }
+
+  Future<void> _onEventName(
+    EventName event,
+    Emitter<ExampleState> emit,
+  ) async {
+    emit(ExampleLoading());
+    
+    try {
+      // Business logic
+      final result = await fetchData();
+      emit(ExampleSuccess(result));
+    } catch (e) {
+      emit(ExampleFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<void> close() {
+    // Clean up resources
+    return super.close();
+  }
+}
+```
+
+```dart example_event.dart
+@immutable
+sealed class ExampleEvent {}
+
+class EventName extends ExampleEvent {
+  final String parameter;
+  EventName(this.parameter);
+}
+```
+
+```dart example_state.dart
+@immutable
+sealed class ExampleState {}
+
+final class ExampleInitial extends ExampleState {}
+
+class ExampleLoading extends ExampleState {}
+
+class ExampleSuccess extends ExampleState {
+  final DataType data;
+  ExampleSuccess(this.data);
+}
+
+class ExampleFailure extends ExampleState {
+  final String errorMessage;
+  ExampleFailure(this.errorMessage);
+}
+```
+</CodeGroup>
+
+### Provider Guidelines
+
+For global state, use ChangeNotifier with Provider:
+
+```dart
+class ExampleNotifier extends ChangeNotifier {
+  DataType _data = initialValue;
+  DataType get data => _data;
+
+  void updateData(DataType newData) {
+    _data = newData;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    // Clean up resources
+    super.dispose();
+  }
+}
+```
+
+### File Organization
+
+```
+lib/
+├── screens/
+│   └── feature_name/
+│       ├── feature_screen.dart       # Main screen widget
+│       ├── bloc/                     # BLoC files (if needed)
+│       │   ├── feature_bloc.dart
+│       │   ├── feature_event.dart
+│       │   └── feature_state.dart
+│       └── widgets/                  # Feature-specific widgets
+│           └── custom_widget.dart
+├── resources/
+│   ├── models/                       # Data models
+│   ├── services/                     # Business logic
+│   └── designs/                      # Themes and styles
+└── widgets/                          # Shared widgets
+```
+
+## Commit Guidelines
+
+### Commit Message Format
+
+Use clear, descriptive commit messages:
+
+```bash
+type(scope): brief description
+
+Detailed explanation if needed.
+
+Fixes #issue_number
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+
+**Examples:**
+```bash
+feat(player): add sleep timer functionality
+
+Implemented a sleep timer that allows users to set a 
+timer for automatic playback stop.
+
+Fixes #123
+```
+
+```bash
+fix(download): resolve crash on storage permission denial
+
+Added proper error handling when storage permission is denied.
+```
+
+### Making Commits
+
+```bash
+# Stage your changes
+git add .
+
+# Commit with a descriptive message
+git commit -m "feat(search): implement advanced search filters"
+
+# Push to your fork
+git push origin feature/your-feature-name
+```
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Sync with Upstream">
+    Before creating a PR, sync with the latest upstream:
+    ```bash
+    git checkout main
+    git pull upstream main
+    git checkout feature/your-feature-name
+    git rebase main
+    ```
+  </Step>
+
+  <Step title="Create Pull Request">
+    1. Go to your fork on GitHub
+    2. Click "New Pull Request"
+    3. Select your feature branch
+    4. Fill in the PR template
+  </Step>
+
+  <Step title="PR Description Template">
+    ```markdown
+    ## Description
+    Brief description of what this PR does.
+    
+    ## Type of Change
+    - [ ] Bug fix
+    - [ ] New feature
+    - [ ] Documentation update
+    - [ ] Performance improvement
+    
+    ## Changes Made
+    - Change 1
+    - Change 2
+    - Change 3
+    
+    ## Screenshots (if applicable)
+    
+    ## Testing
+    - [ ] Tested on Android
+    - [ ] Tested on iOS
+    - [ ] Added/updated tests
+    
+    ## Related Issues
+    Fixes #issue_number
+    ```
+  </Step>
+
+  <Step title="Address Review Comments">
+    If reviewers request changes:
+    ```bash
+    # Make changes
+    git add .
+    git commit -m "address review comments"
+    git push origin feature/your-feature-name
+    ```
+  </Step>
+</Steps>
+
+## Areas for Contribution
+
+<CardGroup cols={2}>
+  <Card title="Bug Fixes" icon="bug">
+    Check the [Issues](https://github.com/sagarchaulagai/aradia/issues) page for bugs to fix
+  </Card>
+  <Card title="New Features" icon="plus">
+    Implement features from the roadmap or propose new ones
+  </Card>
+  <Card title="Documentation" icon="book">
+    Improve documentation, add examples, or fix typos
+  </Card>
+  <Card title="Testing" icon="vial">
+    Add unit tests, widget tests, or integration tests
+  </Card>
+  <Card title="Performance" icon="gauge-high">
+    Optimize code, reduce memory usage, or improve loading times
+  </Card>
+  <Card title="UI/UX" icon="palette">
+    Enhance the user interface and user experience
+  </Card>
+</CardGroup>
+
+## Issue Reporting
+
+### Before Creating an Issue
+
+<Checklist>
+  - [ ] Search existing issues to avoid duplicates
+  - [ ] Update to the latest version and verify the issue persists
+  - [ ] Gather relevant information (logs, screenshots, device info)
+</Checklist>
+
+### Bug Report Template
+
+```markdown
+## Bug Description
+A clear and concise description of the bug.
+
+## Steps to Reproduce
+1. Go to '...'
+2. Click on '...'
+3. Scroll down to '...'
+4. See error
+
+## Expected Behavior
+What you expected to happen.
+
+## Actual Behavior
+What actually happened.
+
+## Screenshots
+If applicable, add screenshots.
+
+## Environment
+- Device: [e.g. Pixel 6]
+- OS: [e.g. Android 13]
+- App Version: [e.g. 3.0.0]
+
+## Additional Context
+Any other relevant information.
+```
+
+### Feature Request Template
+
+```markdown
+## Feature Description
+A clear and concise description of the feature.
+
+## Use Case
+Why is this feature needed? What problem does it solve?
+
+## Proposed Solution
+How you envision this feature working.
+
+## Alternatives Considered
+Other approaches you've thought about.
+
+## Additional Context
+Mockups, examples, or references.
+```
+
+## Community
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/QwTxRKC9UF">
+    Join our Discord community for discussions
+  </Card>
+  <Card title="GitHub Discussions" icon="github">
+    Participate in GitHub Discussions for Q&A
+  </Card>
+</CardGroup>
+
+## Code of Conduct
+
+### Our Standards
+
+- Be respectful and inclusive
+- Welcome newcomers and help them get started
+- Accept constructive criticism gracefully
+- Focus on what's best for the community
+- Show empathy towards others
+
+### Unacceptable Behavior
+
+- Harassment or discriminatory language
+- Trolling or insulting comments
+- Publishing others' private information
+- Any conduct that could reasonably be considered inappropriate
+
+## Recognition
+
+Contributors are recognized in:
+- GitHub contributors page
+- Release notes for significant contributions
+- Special mentions in the README for major features
+
+## Support the Project
+
+If you find this project useful, consider:
+
+- Starring the repository on GitHub
+- Sharing the app with others
+- Supporting via [Ko-fi](https://ko-fi.com/Y8Y61N3ERH)
+- Contributing code or documentation
+
+## Questions?
+
+If you have questions about contributing:
+
+1. Check the [documentation](/)
+2. Ask in [Discord](https://discord.gg/QwTxRKC9UF)
+3. Create a GitHub Discussion
+4. Reach out to maintainers
+
+<Note>
+Remember: Every contribution, no matter how small, is valuable and appreciated!
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Understand the codebase architecture
+  </Card>
+  <Card title="Building from Source" icon="hammer" href="/development/building-from-source">
+    Set up your development environment
+  </Card>
+  <Card title="State Management" icon="gears" href="/development/state-management">
+    Learn about BLoC and Provider patterns
+  </Card>
+</CardGroup>

@@ -1,0 +1,347 @@
+---
+title: AudiobookFile
+description: Model representing an individual audio file or chapter within an audiobook
+---
+
+## Overview
+
+The `AudiobookFile` class represents a single audio file or chapter in an audiobook. It can represent files from Archive.org, YouTube, or local storage. It also supports chapter slicing for books with embedded chapter metadata.
+
+## Properties
+
+<ResponseField name="identifier" type="String?">
+  The audiobook identifier this file belongs to
+</ResponseField>
+
+<ResponseField name="title" type="String?">
+  The title of this specific file or chapter
+</ResponseField>
+
+<ResponseField name="name" type="String?">
+  The filename of the audio file
+</ResponseField>
+
+<ResponseField name="url" type="String?">
+  The URL or local path to the audio file
+</ResponseField>
+
+<ResponseField name="length" type="double?">
+  The duration of the audio file in seconds
+</ResponseField>
+
+<ResponseField name="track" type="int?">
+  The track number or chapter position
+</ResponseField>
+
+<ResponseField name="size" type="int?">
+  The file size in bytes
+</ResponseField>
+
+<ResponseField name="highQCoverImage" type="String?">
+  URL or path to the high-quality cover image for this file
+</ResponseField>
+
+<ResponseField name="startMs" type="int?">
+  Chapter start time in milliseconds (from file start). Used for chapter slicing
+</ResponseField>
+
+<ResponseField name="durationMs" type="int?">
+  Chapter duration in milliseconds. If null, plays to end of file. Used for chapter slicing
+</ResponseField>
+
+## Constructors
+
+### AudiobookFile.fromJson(Map json)
+
+Creates an `AudiobookFile` from Archive.org JSON data.
+
+**Parameters:**
+
+<ParamField path="json" type="Map" required>
+  A map containing file data from the Archive.org API
+</ParamField>
+
+**URL Construction:**
+- File URL: `https://archive.org/download/{identifier}/{name}`
+- Cover image: `https://archive.org/download/{identifier}/{highQCoverImage}`
+
+```dart
+Map<String, dynamic> jsonData = {
+  "identifier": "book123",
+  "title": "Chapter 01",
+  "name": "book123_01.mp3",
+  "track": "1/20",
+  "size": "5242880",
+  "length": "1234.5",
+  "highQCoverImage": "cover.jpg"
+};
+
+AudiobookFile file = AudiobookFile.fromJson(jsonData);
+```
+
+### AudiobookFile.fromYoutubeJson(Map json)
+
+Creates an `AudiobookFile` from YouTube JSON data. The URL is taken directly from the JSON rather than being constructed.
+
+**Parameters:**
+
+<ParamField path="json" type="Map" required>
+  A map containing file data from YouTube
+</ParamField>
+
+```dart
+Map<String, dynamic> jsonData = {
+  "identifier": "youtube123",
+  "title": "Chapter 01",
+  "name": "audio_01.mp3",
+  "url": "https://youtube.com/audio/123.mp3",
+  "track": "1",
+  "size": "5242880",
+  "length": "1234.5"
+};
+
+AudiobookFile file = AudiobookFile.fromYoutubeJson(jsonData);
+```
+
+### AudiobookFile.fromLocalJson(Map json, String location)
+
+Creates an `AudiobookFile` from local storage JSON data.
+
+**Parameters:**
+
+<ParamField path="json" type="Map" required>
+  A map containing file data
+</ParamField>
+
+<ParamField path="location" type="String" required>
+  The local directory path where the audiobook is stored
+</ParamField>
+
+**URL Construction:**
+- File URL: `{location}/{url}`
+- Cover image: `{location}/cover.jpg`
+
+```dart
+Map<String, dynamic> jsonData = {
+  "identifier": "local123",
+  "title": "Chapter 01",
+  "name": "chapter_01.mp3",
+  "url": "chapter_01.mp3",
+  "track": "1",
+  "size": "5242880",
+  "length": "1234.5"
+};
+
+AudiobookFile file = AudiobookFile.fromLocalJson(jsonData, "/storage/audiobooks/book123");
+```
+
+### AudiobookFile.fromMap
+
+Creates an `AudiobookFile` from a map.
+
+**Parameters:**
+
+<ParamField path="map" type="Map" required>
+  A map containing all audiobook file properties (Map&lt;dynamic, dynamic&gt;)
+</ParamField>
+
+```dart
+Map<String, dynamic> map = {
+  "identifier": "book123",
+  "title": "Chapter 01",
+  "name": "book123_01.mp3",
+  "track": 1,
+  "size": 5242880,
+  "length": 1234.5,
+  "url": "https://archive.org/download/book123/book123_01.mp3",
+  "highQCoverImage": "https://archive.org/download/book123/cover.jpg",
+  "startMs": null,
+  "durationMs": null
+};
+
+AudiobookFile file = AudiobookFile.fromMap(map);
+```
+
+## Methods
+
+### toMap()
+
+Converts the audiobook file to a map.
+
+**Returns:** `Map<dynamic, dynamic>`
+
+```dart
+AudiobookFile file = AudiobookFile.fromJson(jsonData);
+Map<dynamic, dynamic> map = file.toMap();
+```
+
+### toJson()
+
+Converts the audiobook file to a JSON-serializable map.
+
+**Returns:** `Map<String, dynamic>`
+
+```dart
+AudiobookFile file = AudiobookFile.fromJson(jsonData);
+Map<String, dynamic> json = file.toJson();
+```
+
+## Static Methods
+
+### chapterSlice
+
+Creates a chapter slice from a larger audio file using time offsets. Useful for audiobooks with embedded chapter metadata.
+
+**Parameters:**
+
+<ParamField path="identifier" type="String" required>
+  The audiobook identifier
+</ParamField>
+
+<ParamField path="url" type="String" required>
+  The URL or path to the parent audio file
+</ParamField>
+
+<ParamField path="parentTitle" type="String" required>
+  The title of the parent file
+</ParamField>
+
+<ParamField path="track" type="int" required>
+  The chapter/track number
+</ParamField>
+
+<ParamField path="chapterTitle" type="String" required>
+  The title of the chapter. If empty, defaults to "{parentTitle} — Chapter {track}"
+</ParamField>
+
+<ParamField path="startMs" type="int" required>
+  The start time of the chapter in milliseconds
+</ParamField>
+
+<ParamField path="durationMs" type="int?">
+  The duration of the chapter in milliseconds. If null, plays to end of file
+</ParamField>
+
+<ParamField path="highQCoverImage" type="String?">
+  URL or path to the cover image
+</ParamField>
+
+**Returns:** `AudiobookFile`
+
+```dart
+AudiobookFile chapter = AudiobookFile.chapterSlice(
+  identifier: "book123",
+  url: "https://archive.org/download/book123/full_book.mp3",
+  parentTitle: "Pride and Prejudice",
+  track: 1,
+  chapterTitle: "Chapter 1: It is a truth universally acknowledged",
+  startMs: 0,
+  durationMs: 1800000, // 30 minutes
+  highQCoverImage: "https://archive.org/download/book123/cover.jpg"
+);
+```
+
+### fromJsonArray(List jsonFiles)
+
+Converts a list of JSON objects into a list of `AudiobookFile` instances. Handles parsing errors gracefully and logs them.
+
+**Parameters:**
+
+<ParamField path="jsonFiles" type="List" required>
+  A list of JSON maps from the Archive.org API response
+</ParamField>
+
+**Returns:** `List<AudiobookFile>`
+
+```dart
+List<dynamic> jsonArray = [
+  {"identifier": "book1", "name": "file1.mp3", "track": "1"},
+  {"identifier": "book1", "name": "file2.mp3", "track": "2"}
+];
+
+List<AudiobookFile> files = AudiobookFile.fromJsonArray(jsonArray);
+```
+
+### fromLocalJsonArray(List jsonFiles, String location)
+
+Converts a list of local JSON objects into `AudiobookFile` instances.
+
+**Parameters:**
+
+<ParamField path="jsonFiles" type="List" required>
+  A list of JSON maps
+</ParamField>
+
+<ParamField path="location" type="String" required>
+  The local directory path
+</ParamField>
+
+**Returns:** `List<AudiobookFile>`
+
+### fromYoutubeJsonArray(List jsonFiles)
+
+Converts a list of YouTube JSON objects into `AudiobookFile` instances.
+
+**Parameters:**
+
+<ParamField path="jsonFiles" type="List" required>
+  A list of JSON maps from YouTube
+</ParamField>
+
+**Returns:** `List<AudiobookFile>`
+
+### fromDownloadedFiles(String audiobookId)
+
+Scans the downloads directory for MP3 files and creates `AudiobookFile` instances from them. Extracts metadata using `flutter_media_metadata`.
+
+**Parameters:**
+
+<ParamField path="audiobookId" type="String" required>
+  The audiobook identifier
+</ParamField>
+
+**Returns:** `Future<Either<String, List<AudiobookFile>>>`
+
+Returns a `Right` with the list of files on success, or a `Left` with an error message on failure.
+
+```dart
+final result = await AudiobookFile.fromDownloadedFiles("book123");
+result.fold(
+  (error) => print("Error: $error"),
+  (files) => print("Found ${files.length} files")
+);
+```
+
+### fromLocalFiles(String audiobookId)
+
+Loads `AudiobookFile` instances from a `files.txt` JSON file in the local audiobook directory.
+
+**Parameters:**
+
+<ParamField path="audiobookId" type="String" required>
+  The audiobook identifier
+</ParamField>
+
+**Returns:** `Future<Either<String, List<AudiobookFile>>>`
+
+### fromYoutubeFiles(String audiobookId)
+
+Loads `AudiobookFile` instances from a `files.txt` JSON file in the YouTube audiobook directory.
+
+**Parameters:**
+
+<ParamField path="audiobookId" type="String" required>
+  The audiobook identifier
+</ParamField>
+
+**Returns:** `Future<Either<String, List<AudiobookFile>>>`
+
+## Helper Methods
+
+The class includes private static helper methods for safe type parsing:
+
+- `_parseTrack(dynamic value)` - Safely parses track numbers, handling strings like "1/20"
+- `_parseIntSafely(dynamic value)` - Safely parses integers from various types
+- `_parseDoubleSafely(dynamic value)` - Safely parses doubles from various types
+
+These methods log debug messages when parsing errors occur and return sensible defaults (0 or 0.0).

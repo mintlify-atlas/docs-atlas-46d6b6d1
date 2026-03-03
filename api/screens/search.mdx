@@ -1,0 +1,439 @@
+---
+title: 'SearchAudiobook Screen'
+description: 'Search interface for discovering audiobooks by title, author, or subject'
+---
+
+## Overview
+
+The `SearchAudiobook` screen provides a comprehensive search interface for discovering audiobooks from the LibriVox archive. Users can search by title, author, or subject with support for multiple search terms and infinite scroll pagination.
+
+**File Location**: `lib/screens/search/search_audiobook.dart`
+
+## Purpose and Functionality
+
+The SearchAudiobook screen enables:
+
+- Searching audiobooks by title, author, or subject
+- Multi-term search with comma-separated values (OR logic)
+- Filter chips for switching between search types
+- Infinite scroll pagination for loading more results
+- Direct navigation to audiobook details from search results
+- Real-time search query building for Archive.org API
+
+## Key Components
+
+### State Management
+
+Uses `SearchBloc` for managing search queries and results:
+
+```dart
+late SearchBloc searchBloc;
+String searchFilter = 'title'; // 'title' | 'author' | 'subject'
+bool isLoadingMore = false;
+```
+
+### Controllers
+
+```dart
+final TextEditingController _searchController = TextEditingController();
+final ScrollController _scrollController = ScrollController();
+```
+
+The scroll controller monitors scroll position to trigger pagination when reaching the bottom.
+
+## Widget Structure
+
+The screen layout:
+
+1. **App Bar**
+   - Title: "Search Audiobooks"
+
+2. **Search Bar** (white card with shadow)
+   - Text input field with dynamic hint text
+   - Search icon button (circular, orange)
+
+3. **Filter Section**
+   - "LibriVox" label
+   - Horizontal scrollable filter chips:
+     - Title (book icon)
+     - Author (person icon)
+     - Subjects (category icon)
+
+4. **Results List** (BlocConsumer)
+   - Card-based list items with:
+     - Cover image (60x60)
+     - Title (bold)
+     - Author
+   - Loading indicator at bottom (when loading more)
+   - Error snackbar on failure
+
+## Search Query Building
+
+The screen builds Archive.org advanced search queries:
+
+```dart
+String _buildSearchQuery(String searchText) {
+  final terms = searchText
+      .split(',')
+      .map((t) => t.trim())
+      .where((t) => t.isNotEmpty)
+      .toList();
+
+  // If multiple terms, OR them. Keep it raw (no %3A)
+  final joined = terms.length > 1
+      ? terms.join(' OR ')
+      : (terms.isEmpty ? '' : terms.first);
+
+  switch (searchFilter) {
+    case 'author':
+      return joined.isEmpty ? '' : 'creator:($joined)';
+    case 'subject':
+      return joined.isEmpty ? '' : 'subject:($joined)';
+    default:
+      return joined.isEmpty ? '' : 'title:($joined)';
+  }
+}
+```
+
+### Query Examples
+
+- **Single title**: `"title:(Sherlock Holmes)"`
+- **Multiple authors**: `"creator:(Mark Twain OR Jane Austen)"`
+- **Multiple subjects**: `"subject:(Mystery OR Science Fiction)"`
+
+## BLoC Events
+
+### EventSearchIconClicked
+```dart
+EventSearchIconClicked(searchQuery)
+```
+Initiates a new search with the provided query. Resets to page 1 and locks in the query for pagination.
+
+### EventLoadMoreResults
+```dart
+EventLoadMoreResults(searchQuery)
+```
+Loads the next page of results for the current query. Uses the locked-in `lastQuery` from the bloc, not the current text field value.
+
+## BLoC States
+
+### Initial and Loading States
+- `SearchInitial` - Initial state before any search
+- `SearchLoading` - Fetching search results (first page only)
+
+### Success State
+- `SearchSuccess(audiobooks)` - Contains list of matching audiobooks
+  - For pagination, appends to existing list
+  - Property: `List<Audiobook> audiobooks`
+
+### Failure State
+- `SearchFailure(errorMessage)` - Search request failed
+  - Property: `String errorMessage`
+
+## Navigation
+
+### Audiobook Details Screen
+```dart
+context.push('/audiobook-details', extra: {
+  'audiobook': audiobook,
+  'isDownload': false,
+  'isYoutube': false,
+  'isLocal': false,
+})
+```
+Navigates to the detailed view when a search result is tapped.
+
+## Code Examples
+
+### Scroll Listener for Pagination
+
+```dart
+@override
+void initState() {
+  super.initState();
+  searchBloc = BlocProvider.of<SearchBloc>(context);
+
+  _scrollController.addListener(() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent &&
+        !isLoadingMore) {
+      final state = searchBloc.state;
+      if (state is SearchSuccess && state.audiobooks.isNotEmpty) {
+        setState(() => isLoadingMore = true);
+        // Use lastQuery from bloc, not current text
+        searchBloc.add(EventLoadMoreResults(searchBloc.lastQuery ?? ''));
+      }
+    }
+  });
+}
+```
+
+### Search Submission
+
+```dart
+// Via text field submit
+TextField(
+  controller: _searchController,
+  onSubmitted: (value) {
+    FocusScope.of(context).unfocus();
+    final q = _buildSearchQuery(value);
+    if (q.isNotEmpty) {
+      searchBloc.add(EventSearchIconClicked(q));
+    }
+  },
+)
+
+// Via search button
+GestureDetector(
+  onTap: () {
+    FocusScope.of(context).unfocus();
+    final q = _buildSearchQuery(_searchController.text);
+    if (q.isNotEmpty) {
+      searchBloc.add(EventSearchIconClicked(q));
+    }
+  },
+  child: Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: AppColors.primaryColor,
+      shape: BoxShape.circle,
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.primaryColor.withValues(alpha: 0.4),
+          blurRadius: 6,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    ),
+    child: const Icon(Icons.search, color: Colors.white, size: 24),
+  ),
+)
+```
+
+### Filter Chip Builder
+
+```dart
+Widget _buildFilterChip({
+  required IconData icon,
+  required String label,
+  required bool selected,
+  required Function(bool) onSelected,
+}) {
+  return FilterChip(
+    label: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: selected ? Colors.white : Colors.grey),
+        const SizedBox(width: 4),
+        Text(label),
+      ],
+    ),
+    selected: selected,
+    onSelected: onSelected,
+    selectedColor: AppColors.primaryColor,
+    checkmarkColor: Colors.white,
+    labelStyle: TextStyle(color: selected ? Colors.white : Colors.grey),
+  );
+}
+```
+
+### Filter Chip Usage
+
+```dart
+SingleChildScrollView(
+  scrollDirection: Axis.horizontal,
+  child: Padding(
+    padding: const EdgeInsets.only(left: 8),
+    child: Row(
+      children: [
+        _buildFilterChip(
+          icon: Icons.book,
+          label: 'Title',
+          selected: searchFilter == 'title',
+          onSelected: (_) => setState(() => searchFilter = 'title'),
+        ),
+        const SizedBox(width: 8),
+        _buildFilterChip(
+          icon: Icons.person,
+          label: 'Author',
+          selected: searchFilter == 'author',
+          onSelected: (_) => setState(() => searchFilter = 'author'),
+        ),
+        const SizedBox(width: 8),
+        _buildFilterChip(
+          icon: Icons.category,
+          label: 'Subjects',
+          selected: searchFilter == 'subject',
+          onSelected: (_) => setState(() => searchFilter = 'subject'),
+        ),
+      ],
+    ),
+  ),
+)
+```
+
+### Results List with Pagination
+
+```dart
+BlocConsumer<SearchBloc, SearchState>(
+  listener: (context, state) {
+    if (state is SearchFailure) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage),
+          backgroundColor: Colors.red.shade300,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (state is SearchSuccess) {
+      setState(() => isLoadingMore = false);
+    }
+  },
+  builder: (context, state) {
+    if (state is SearchLoading && !isLoadingMore) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryColor),
+      );
+    } else if (state is SearchSuccess) {
+      return ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(8),
+        itemCount: state.audiobooks.length + 1,
+        itemBuilder: (context, index) {
+          if (index == state.audiobooks.length) {
+            return isLoadingMore
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryColor,
+                      ),
+                    ),
+                  )
+                : const SizedBox();
+          }
+          final audiobook = state.audiobooks[index];
+          return Card(
+            elevation: 2,
+            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(8),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LowAndHighImage(
+                  lowQImage: audiobook.lowQCoverImage,
+                  highQImage: audiobook.lowQCoverImage,
+                  width: 60,
+                  height: 60,
+                ),
+              ),
+              title: Text(
+                audiobook.title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                audiobook.author ?? 'Unknown Author',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              onTap: () {
+                context.push('/audiobook-details', extra: {
+                  'audiobook': audiobook,
+                  'isDownload': false,
+                  'isYoutube': false,
+                  'isLocal': false,
+                });
+              },
+            ),
+          );
+        },
+      );
+    }
+    return const SizedBox();
+  },
+)
+```
+
+### Dynamic Hint Text
+
+```dart
+String _getHintText() {
+  switch (searchFilter) {
+    case 'author':
+      return 'Search by author...';
+    case 'subject':
+      return 'Search by subject...';
+    default:
+      return 'Search by title...';
+  }
+}
+```
+
+## Search Bloc Implementation
+
+The `SearchBloc` maintains state for pagination:
+
+```dart
+class SearchBloc extends Bloc<SearchEvent, SearchState> {
+  int currentPage = 1;
+  String? lastQuery;  // Locked-in query for pagination
+
+  // On new search submission
+  Future<void> _onSearchSubmitted(...) async {
+    currentPage = 1;
+    lastQuery = event.searchQuery;
+    await _runSearch(emit, query: lastQuery!, page: currentPage, isFresh: true);
+  }
+
+  // On load more
+  Future<void> _onLoadMore(...) async {
+    final q = lastQuery?.trim();
+    if (q == null || q.isEmpty) return;
+    
+    currentPage += 1;
+    await _runSearch(emit, query: q, page: currentPage, isFresh: false);
+  }
+}
+```
+
+## Lifecycle Management
+
+### Disposal
+
+```dart
+@override
+void dispose() {
+  _scrollController.dispose();
+  _searchController.dispose();
+  super.dispose();
+}
+```
+
+## Dependencies
+
+- `flutter_bloc` - State management
+- `go_router` - Navigation
+- `google_fonts` - Typography
+
+## Custom Widgets Used
+
+- `LowAndHighImage` - Progressive image loading for cover art
+
+## API Integration
+
+Searches are performed via `ArchiveApi.searchAudiobook()`:
+
+```dart
+final res = await ArchiveApi().searchAudiobook(query, page, 10);
+```
+
+**Parameters:**
+- `query`: Archive.org advanced search query string (e.g., `"title:(Sherlock)"`, `"creator:(Mark Twain OR Jane Austen)"`)
+- `page`: Current page number (1-indexed)
+- `rows`: Number of results per page (default: 10)
+
+**Returns:** `Either<String, List<Audiobook>>`
+- Left: Error message
+- Right: List of audiobooks matching the query

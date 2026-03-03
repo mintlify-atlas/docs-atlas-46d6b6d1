@@ -1,0 +1,463 @@
+---
+title: 'Search & Browse'
+description: 'Advanced search capabilities with filters for title, author, and genre across the entire audiobook library'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+Aradia provides powerful search and browsing capabilities for discovering audiobooks from the 20,000+ LibriVox/Archive.org catalog. Search by title, author, or subject with multi-language support and genre filtering.
+
+## Search Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Field Search" icon="filter">
+    Search by title, author, or subject tags
+  </Card>
+  <Card title="Multi-Term Queries" icon="tags">
+    Use comma-separated terms for OR queries
+  </Card>
+  <Card title="Infinite Scroll" icon="arrows-down-to-line">
+    Automatic pagination as you scroll
+  </Card>
+  <Card title="Real-Time Results" icon="bolt">
+    Instant search results from Archive.org
+  </Card>
+</CardGroup>
+
+## Search Interface
+
+The search screen provides an intuitive interface with filter chips:
+
+<CodeGroup>
+```dart Search UI (search_audiobook.dart:90-226)
+Column(
+  children: [
+    // Search bar
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: _getHintText(),
+                border: InputBorder.none,
+              ),
+              onSubmitted: (value) {
+                final q = _buildSearchQuery(value);
+                if (q.isNotEmpty) {
+                  searchBloc.add(EventSearchIconClicked(q));
+                }
+              },
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              final q = _buildSearchQuery(_searchController.text);
+              if (q.isNotEmpty) {
+                searchBloc.add(EventSearchIconClicked(q));
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.search, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    ),
+    // Filter chips...
+  ],
+)
+```
+</CodeGroup>
+
+## Search Filters
+
+Three search modes are available:
+
+<Tabs>
+  <Tab title="Title Search">
+    Search audiobooks by title:
+    
+    ```dart Title Filter
+    case 'title':
+      return joined.isEmpty ? '' : 'title:($joined)';
+    ```
+    
+    <Info>
+    Example: "war and peace" searches for titles containing these words
+    </Info>
+  </Tab>
+  
+  <Tab title="Author Search">
+    Search by author or narrator:
+    
+    ```dart Author Filter
+    case 'author':
+      return joined.isEmpty ? '' : 'creator:($joined)';
+    ```
+    
+    <Info>
+    Example: "tolstoy" finds all works by Tolstoy
+    </Info>
+  </Tab>
+  
+  <Tab title="Subject Search">
+    Search by genre tags and subjects:
+    
+    ```dart Subject Filter
+    case 'subject':
+      return joined.isEmpty ? '' : 'subject:($joined)';
+    ```
+    
+    <Info>
+    Example: "philosophy, ethics" finds books tagged with either subject
+    </Info>
+  </Tab>
+</Tabs>
+
+### Multi-Term Queries
+
+Use commas to create OR queries:
+
+<CodeGroup>
+```dart Query Building (search_audiobook.dart:50-72)
+String _buildSearchQuery(String searchText) {
+  final terms = searchText
+      .split(',')
+      .map((t) => t.trim())
+      .where((t) => t.isNotEmpty)
+      .toList();
+
+  // If multiple terms, OR them
+  final joined = terms.length > 1
+      ? terms.join(' OR ')
+      : (terms.isEmpty ? '' : terms.first);
+
+  switch (searchFilter) {
+    case 'author':
+      return joined.isEmpty ? '' : 'creator:($joined)';
+    case 'subject':
+      return joined.isEmpty ? '' : 'subject:($joined)';
+    default:
+      return joined.isEmpty ? '' : 'title:($joined)';
+  }
+}
+```
+</CodeGroup>
+
+<Tip>
+**Example**: Searching for "philosophy, ethics" in subject mode finds audiobooks tagged with either "philosophy" OR "ethics".
+</Tip>
+
+## Filter Chips
+
+Visual filter selection with icons:
+
+<CodeGroup>
+```dart Filter Chips (search_audiobook.dart:188-220)
+Row(
+  children: [
+    _buildFilterChip(
+      icon: Icons.book,
+      label: 'Title',
+      selected: searchFilter == 'title',
+      onSelected: (_) => setState(() => searchFilter = 'title'),
+    ),
+    const SizedBox(width: 8),
+    _buildFilterChip(
+      icon: Icons.person,
+      label: 'Author',
+      selected: searchFilter == 'author',
+      onSelected: (_) => setState(() => searchFilter = 'author'),
+    ),
+    const SizedBox(width: 8),
+    _buildFilterChip(
+      icon: Icons.category,
+      label: 'Subjects',
+      selected: searchFilter == 'subject',
+      onSelected: (_) => setState(() => searchFilter = 'subject'),
+    ),
+  ],
+)
+```
+</CodeGroup>
+
+## Infinite Scroll
+
+Search results load more as you scroll:
+
+<CodeGroup>
+```dart Scroll Pagination (search_audiobook.dart:29-40)
+_scrollController.addListener(() {
+  if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent &&
+      !isLoadingMore) {
+    final state = searchBloc.state;
+    if (state is SearchSuccess && state.audiobooks.isNotEmpty) {
+      setState(() => isLoadingMore = true);
+      searchBloc.add(EventLoadMoreResults(searchBloc.lastQuery ?? ''));
+    }
+  }
+});
+```
+</CodeGroup>
+
+### Loading States
+
+<CodeGroup>
+```dart Loading Indicators (search_audiobook.dart:245-267)
+if (state is SearchLoading && !isLoadingMore) {
+  return const Center(
+    child: CircularProgressIndicator(
+      color: AppColors.primaryColor
+    ),
+  );
+} else if (state is SearchSuccess) {
+  return ListView.builder(
+    controller: _scrollController,
+    itemCount: state.audiobooks.length + 1,
+    itemBuilder: (context, index) {
+      if (index == state.audiobooks.length) {
+        return isLoadingMore
+            ? const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            : const SizedBox();
+      }
+      // Display audiobook item...
+    },
+  );
+}
+```
+</CodeGroup>
+
+## Genre Browsing
+
+Browse audiobooks by genre with curated categories:
+
+<CodeGroup>
+```dart Genre Screen (genre_audiobooks.dart:9-57)
+class GenreAudiobooksScreen extends StatelessWidget {
+  final String genre;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('${_capitalizeFirstLetter(genre)} Audiobooks'),
+          bottom: TabBar(
+            indicatorColor: AppColors.primaryColor,
+            tabs: [
+              Tab(text: 'Popular'),
+              Tab(text: 'Weekly'),
+              Tab(text: 'Latest'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _AudiobookListView(
+              genre: genre,
+              listType: 'popular',
+            ),
+            _AudiobookListView(
+              genre: genre,
+              listType: 'popularWeekly',
+            ),
+            _AudiobookListView(
+              genre: genre,
+              listType: 'latest',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+</CodeGroup>
+
+### Available Genres
+
+<AccordionGroup>
+  <Accordion title="Browse by Category" icon="list">
+    - Adventure & Exploration
+    - Biography & Memoir
+    - Children's Literature
+    - Comedy & Humor
+    - Crime & Mystery
+    - Fantasy & Mythology
+    - Horror & Supernatural
+    - Philosophy & Ethics
+    - Poetry
+    - Religion & Spirituality
+    - Romance & Love Stories
+    - Science Fiction
+    - War & Military History
+  </Accordion>
+</AccordionGroup>
+
+## Home Screen Integration
+
+The home screen displays curated audiobook sections:
+
+<CodeGroup>
+```dart Home Sections (home.dart:261-278)
+Widget _buildFeaturedSections() {
+  return Column(
+    children: [
+      MyAudiobooks(
+        title: 'Popular All Time',
+        homeBloc: _popularBloc,
+        fetchType: AudiobooksFetchType.popular,
+        scrollController: _popularCtrl,
+      ),
+      MyAudiobooks(
+        title: 'Trending This Week',
+        homeBloc: _trendingBloc,
+        fetchType: AudiobooksFetchType.popularOfWeek,
+        scrollController: _trendingCtrl,
+      ),
+    ],
+  );
+}
+```
+</CodeGroup>
+
+### Personalized Recommendations
+
+<CodeGroup>
+```dart Recommendations (home.dart:188-210)
+FutureBuilder<String>(
+  future: _recommendedGenresFuture,
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.done &&
+        snapshot.hasData &&
+        snapshot.data != null &&
+        snapshot.data!.isNotEmpty) {
+      return _buildLazyLoadSection(
+        context,
+        'Recommended for you',
+        snapshot.data!,
+      );
+    }
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: CircularProgressIndicator(
+          color: AppColors.primaryColor,
+        ),
+      ),
+    );
+  },
+)
+```
+</CodeGroup>
+
+<Info>
+Recommendations are based on your listening history and favorite genres.
+</Info>
+
+## Search Results Display
+
+Results are displayed in a card list with cover art:
+
+<CodeGroup>
+```dart Result Cards (search_audiobook.dart:269-308)
+Card(
+  elevation: 2,
+  margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+  ),
+  child: ListTile(
+    contentPadding: const EdgeInsets.all(8),
+    leading: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: LowAndHighImage(
+        lowQImage: audiobook.lowQCoverImage,
+        highQImage: audiobook.lowQCoverImage,
+        width: 60,
+        height: 60,
+      ),
+    ),
+    title: Text(
+      audiobook.title,
+      style: const TextStyle(fontWeight: FontWeight.bold),
+    ),
+    subtitle: Text(
+      audiobook.author ?? 'Unknown Author',
+      style: TextStyle(color: Colors.grey.shade600),
+    ),
+    onTap: () {
+      context.push(
+        '/audiobook-details',
+        extra: {
+          'audiobook': audiobook,
+          'isDownload': false,
+          'isYoutube': false,
+          'isLocal': false,
+        },
+      );
+    },
+  ),
+)
+```
+</CodeGroup>
+
+## Error Handling
+
+<CodeGroup>
+```dart Error Display (search_audiobook.dart:230-240)
+BlocConsumer<SearchBloc, SearchState>(
+  listener: (context, state) {
+    if (state is SearchFailure) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage),
+          backgroundColor: Colors.red.shade300,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  },
+  // ...
+)
+```
+</CodeGroup>
+
+<Warning>
+Search requires an active internet connection to query the Archive.org API.
+</Warning>
+
+<Check>
+Search results include full metadata: title, author, description, runtime, ratings, and cover art!
+</Check>
+
+<Card title="Related" icon="book-open" href="/features/audiobook-library">
+  Learn more about the audiobook library and metadata
+</Card>

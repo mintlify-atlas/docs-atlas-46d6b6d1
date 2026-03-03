@@ -1,0 +1,290 @@
+---
+title: 'DownloadManager'
+description: 'Service for downloading audiobooks with YouTube and direct URL support'
+---
+
+The `DownloadManager` class provides functionality to download audiobooks from both YouTube and direct URLs, with progress tracking, pause/resume capabilities, and persistent state management.
+
+## Overview
+
+`DownloadManager` is a singleton service that handles:
+- Downloading audiobook files from YouTube using `youtube_explode_dart`
+- Direct URL downloads using `background_downloader`
+- Progress tracking and status persistence in Hive
+- Download cancellation and cleanup
+- Permission handling for storage and notifications
+
+**Source:** `lib/resources/services/download/download_manager.dart`
+
+## Public Methods
+
+### checkAndRequestPermissions
+
+Requests necessary permissions for downloading files.
+
+**Returns:** `Future<bool>` - True if permissions granted
+
+**Example:**
+```dart
+final manager = DownloadManager();
+final hasPermission = await manager.checkAndRequestPermissions();
+if (!hasPermission) {
+  // Show permission denied message
+}
+```
+
+### downloadAudiobook
+
+Downloads all files for an audiobook with progress tracking.
+
+<ParamField path="audiobookId" type="String" required>
+  Unique identifier for the audiobook
+</ParamField>
+
+<ParamField path="audiobookTitle" type="String" required>
+  Title of the audiobook for notifications
+</ParamField>
+
+<ParamField path="files" type="List<Map<String, dynamic>>" required>
+  List of file metadata with 'title', 'url' keys
+</ParamField>
+
+<ParamField path="onProgressUpdate" type="Function(double)" required>
+  Callback invoked with progress from 0.0 to 1.0
+</ParamField>
+
+<ParamField path="onCompleted" type="Function(bool)" required>
+  Callback invoked when download completes (true) or fails (false)
+</ParamField>
+
+**Returns:** `Future<void>`
+
+The method:
+- Detects YouTube URLs and extracts audio streams
+- Handles direct URL downloads with background downloader
+- Updates progress in Hive storage (`download_status_box`)
+- Automatically cleans up partial downloads on failure
+- Supports notifications if permission granted
+
+**Example:**
+```dart
+await manager.downloadAudiobook(
+  'pride_prejudice_librivox',
+  'Pride and Prejudice',
+  [
+    {'title': 'Chapter 01', 'url': 'https://archive.org/download/...'},
+    {'title': 'Chapter 02', 'url': 'https://www.youtube.com/watch?v=...'},
+  ],
+  (progress) {
+    print('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+  },
+  (success) {
+    if (success) {
+      print('Download completed!');
+    } else {
+      print('Download failed or cancelled');
+    }
+  },
+);
+```
+
+### cancelDownload
+
+Cancels an active download and removes partial files.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook to cancel
+</ParamField>
+
+**Returns:** `void`
+
+**Example:**
+```dart
+manager.cancelDownload('pride_prejudice_librivox');
+```
+
+### isDownloading
+
+Checks if an audiobook is currently being downloaded.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook to check
+</ParamField>
+
+**Returns:** `bool`
+
+**Example:**
+```dart
+if (manager.isDownloading(audiobookId)) {
+  // Show downloading indicator
+}
+```
+
+### isDownloaded
+
+Checks if an audiobook download has completed successfully.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook to check
+</ParamField>
+
+**Returns:** `bool`
+
+**Example:**
+```dart
+if (manager.isDownloaded(audiobookId)) {
+  // Show downloaded badge
+}
+```
+
+### getProgress
+
+Retrieves the current download progress for an audiobook.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook
+</ParamField>
+
+**Returns:** `double` - Progress from 0.0 to 1.0
+
+**Example:**
+```dart
+final progress = manager.getProgress(audiobookId);
+print('${(progress * 100).toInt()}% complete');
+```
+
+### getError
+
+Retrrieves any error message for a failed download.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook
+</ParamField>
+
+**Returns:** `String?` - Error message or null if no error
+
+**Example:**
+```dart
+final error = manager.getError(audiobookId);
+if (error != null) {
+  print('Download error: $error');
+}
+```
+
+### isYouTubeDownload
+
+Checks if the audiobook was downloaded from YouTube.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook
+</ParamField>
+
+**Returns:** `bool?` - True if YouTube download, false if direct URL, null if not found
+
+**Example:**
+```dart
+final isYT = manager.isYouTubeDownload(audiobookId);
+if (isYT == true) {
+  // Show YouTube icon
+}
+```
+
+### pauseDownload
+
+Pauses a direct URL download (not supported for YouTube downloads).
+
+<ParamField path="uniqueFileTaskId" type="String" required>
+  Task ID for the specific file being downloaded
+</ParamField>
+
+**Returns:** `Future<void>`
+
+**Note:** Only works with direct URL downloads, not YouTube streams.
+
+### resumeDownload
+
+Resumes a paused direct URL download.
+
+<ParamField path="uniqueFileTaskId" type="String" required>
+  Task ID for the specific file to resume
+</ParamField>
+
+**Returns:** `Future<void>`
+
+### getTaskIdsForAudiobook
+
+Retrieves all download task IDs for a specific audiobook.
+
+<ParamField path="audiobookId" type="String" required>
+  ID of the audiobook
+</ParamField>
+
+**Returns:** `List<String>` - List of task IDs
+
+**Example:**
+```dart
+final tasks = manager.getTaskIdsForAudiobook(audiobookId);
+for (final taskId in tasks) {
+  await manager.pauseDownload(taskId);
+}
+```
+
+## Download Status Structure
+
+The download status stored in Hive contains:
+
+```dart
+{
+  'isDownloading': bool,      // Currently downloading
+  'progress': double,          // 0.0 to 1.0
+  'isCompleted': bool,         // Successfully completed
+  'audiobookTitle': String,    // Title for display
+  'audiobookId': String,       // Unique identifier
+  'isYouTube': bool,           // Source type
+  'error': String?,            // Error message if failed
+  'downloadDate': String?,     // ISO8601 timestamp when completed
+}
+```
+
+## YouTube Download Implementation
+
+For YouTube URLs, the manager:
+1. Parses video ID from URL
+2. Fetches audio manifest using `YoutubeExplode` with AndroidVR client
+3. Selects highest quality MP4 audio stream
+4. Streams audio data in chunks to handle throttling
+5. Saves to external storage as MP3 files
+
+**Chunk threshold:** Files larger than 50MB or throttled streams use chunked downloading.
+
+## Storage Location
+
+Downloaded files are stored at:
+```
+{externalStorageDirectory}/downloads/{audiobookId}/{filename}.mp3
+```
+
+**Example path:**
+```
+/storage/emulated/0/Android/data/com.oseamiya.aradia/files/downloads/pride_prejudice_librivox/Chapter 01.mp3
+```
+
+## Error Handling
+
+The manager handles:
+- Network failures during download
+- Invalid YouTube URLs
+- Insufficient storage space
+- Permission denials
+- Download cancellations
+
+All errors are logged via `AppLogger` and persisted in the download status.
+
+## Cleanup
+
+Partial downloads are automatically cleaned up when:
+- Download is cancelled via `cancelDownload()`
+- Download fails with an error
+- User requests cancellation during active download
+
+The cleanup removes both the download directory and status entries from Hive.

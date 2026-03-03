@@ -1,0 +1,386 @@
+---
+title: 'Advanced Audio Player'
+description: 'Feature-rich audio player with speed control, skip silence, sleep timer, and Chromecast support'
+icon: 'circle-play'
+---
+
+## Overview
+
+Aradia's audio player is built on the `audio_service` package and provides professional-grade playback controls optimized for long-form audiobook listening.
+
+## Player Features
+
+<CardGroup cols={2}>
+  <Card title="Speed Control" icon="gauge-high">
+    Adjust playback speed from 0.5x to 2.0x
+  </Card>
+  <Card title="Skip Silence" icon="forward">
+    Automatically skip silent portions of audio
+  </Card>
+  <Card title="Sleep Timer" icon="clock">
+    Set timer to pause at specific intervals or end of track
+  </Card>
+  <Card title="Chromecast" icon="chromecast">
+    Cast audio to Google Cast devices
+  </Card>
+</CardGroup>
+
+## Playback Speed Control
+
+Adjust playback speed with precise control:
+
+<CodeGroup>
+```dart Speed Control Implementation (controls.dart:37-76)
+void _changePlaybackSpeed() {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setModalState) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Adjust Playback Speed',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            Slider(
+              value: _playbackSpeed,
+              min: 0.5,
+              max: 2.0,
+              divisions: 6,
+              label: "${_playbackSpeed.toStringAsFixed(1)}x",
+              onChanged: (value) {
+                setModalState(() {
+                  _playbackSpeed = value;
+                });
+                setState(() {
+                  widget.audioHandler.setSpeed(_playbackSpeed);
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+```
+</CodeGroup>
+
+<Info>
+Speed adjustments range from **0.5x** (half speed) to **2.0x** (double speed) with 6 preset divisions.
+</Info>
+
+## Skip Silence
+
+Automatically skip silent portions of the audio for a smoother listening experience:
+
+<CodeGroup>
+```dart Skip Silence Toggle (controls.dart:172-184)
+IconButton(
+  onPressed: widget.onToggleSkipSilence,
+  icon: Icon(
+    widget.skipSilence ? Ionicons.flash : Ionicons.flash_outline,
+    color: widget.skipSilence
+        ? Colors.deepOrange
+        : (Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : Colors.black),
+  ),
+  tooltip: widget.skipSilence ? 'Skip Silence On' : 'Skip Silence Off',
+)
+```
+</CodeGroup>
+
+<Tip>
+Skip Silence is particularly useful for audiobooks with long pauses between chapters.
+</Tip>
+
+## Sleep Timer
+
+Set a sleep timer to automatically pause playback:
+
+<Tabs>
+  <Tab title="Preset Durations">
+    Available timer presets:
+    - 15 minutes
+    - 30 minutes
+    - 45 minutes
+    - 60 minutes
+    - 90 minutes
+    - End of current track
+  </Tab>
+  
+  <Tab title="Implementation">
+    ```dart Sleep Timer (audiobook_player.dart:109-142)
+    Future<void> startTimer(Duration duration) async {
+      if (duration == TimerDurations.endOfTrack) {
+        await _startEndOfTrackTimer();
+        return;
+      }
+
+      const androidConfig = FlutterBackgroundAndroidConfig(
+        notificationTitle: "Audiobook Timer Running",
+        notificationText: "The timer will pause playback when it expires.",
+        notificationImportance: AndroidNotificationImportance.max,
+      );
+
+      final result = await FlutterBackground.initialize(
+        androidConfig: androidConfig
+      );
+      
+      if (result) {
+        await FlutterBackground.enableBackgroundExecution();
+
+        _sleepTimer.start(
+          duration: duration,
+          onExpired: () {
+            audioHandlerProvider.audioHandler.pause();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Timer expired! Audiobook paused.')
+                ),
+              );
+            }
+            FlutterBackground.disableBackgroundExecution();
+          },
+        );
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### End of Track Timer
+
+The "End of Track" timer dynamically adjusts based on the current playback position:
+
+<CodeGroup>
+```dart End of Track Timer (audiobook_player.dart:144-208)
+Future<void> _startEndOfTrackTimer() async {
+  _isEndOfTrackTimerActive = true;
+  Duration? lastKnownDuration;
+  Duration? lastKnownPosition;
+
+  // Listen to position stream for real-time updates
+  _positionSubscription = audioHandlerProvider.audioHandler
+      .getPositionStream()
+      .listen((positionData) {
+    if (_isEndOfTrackTimerActive && positionData.duration > Duration.zero) {
+      // Calculate remaining time in current track
+      final remainingTime = positionData.duration - positionData.position;
+
+      if (remainingTime > Duration.zero) {
+        // Restart timer with updated remaining time
+        _sleepTimer.start(
+          duration: remainingTime,
+          onExpired: () {
+            audioHandlerProvider.audioHandler.pause();
+            _isEndOfTrackTimerActive = false;
+            FlutterBackground.disableBackgroundExecution();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Track ended! Audiobook paused.')
+                ),
+              );
+            }
+          },
+        );
+      }
+    }
+  });
+}
+```
+</CodeGroup>
+
+<Warning>
+Sleep timers require background execution permissions on Android to work reliably when the screen is off.
+</Warning>
+
+## Chromecast Support
+
+Cast your audiobooks to any Google Cast-enabled device:
+
+<Steps>
+  <Step title="Request Permissions">
+    Location permission is required for WiFi device discovery on Android 10+
+    
+    ```dart Permission Request (chromecast_button.dart:14-27)
+    Future<void> _showDeviceDialog(BuildContext context) async {
+      final status = await Permission.location.request();
+
+      if (!status.isGranted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location permission is required to discover ChromeCast devices'
+            ),
+          ),
+        );
+        return;
+      }
+      
+      chromeCastService.startDiscovery();
+    }
+    ```
+  </Step>
+  
+  <Step title="Discover Devices">
+    The app automatically scans for available Cast devices:
+    
+    ```dart Device Discovery (chromecast_button.dart:85-101)
+    StreamBuilder<List<GoogleCastDevice>>(
+      stream: chromeCastService.devicesStream,
+      builder: (context, snapshot) {
+        final devices = snapshot.data ?? [];
+        if (devices.isEmpty) {
+          return const Column(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Searching for devices...'),
+            ],
+          );
+        }
+        // Display device list...
+      },
+    )
+    ```
+  </Step>
+  
+  <Step title="Connect & Cast">
+    Tap a device to start casting:
+    
+    ```dart Device Connection (chromecast_button.dart:111-114)
+    onTap: () async {
+      await chromeCastService.connectToDevice(device);
+      if (context.mounted) Navigator.pop(context);
+    }
+    ```
+  </Step>
+</Steps>
+
+## Playback Controls
+
+<CardGroup cols={3}>
+  <Card title="Skip Backward" icon="backward">
+    Jump back 10 seconds
+  </Card>
+  <Card title="Play/Pause" icon="play">
+    Toggle playback
+  </Card>
+  <Card title="Skip Forward" icon="forward">
+    Jump ahead 10 seconds
+  </Card>
+</CardGroup>
+
+### Control Implementation
+
+<CodeGroup>
+```dart Playback Controls (controls.dart:206-280)
+Row(
+  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  children: [
+    IconButton(
+      onPressed: () {
+        widget.audioHandler.seek(
+          widget.audioHandler.position - const Duration(seconds: 10)
+        );
+      },
+      icon: const Icon(Icons.replay_10),
+      iconSize: 32.0,
+    ),
+    IconButton(
+      onPressed: () {
+        widget.audioHandler.playPrevious();
+      },
+      icon: const Icon(Icons.skip_previous),
+      iconSize: 32.0,
+    ),
+    StreamBuilder<PlaybackState>(
+      stream: widget.audioHandler.playbackState,
+      builder: (context, snapshot) {
+        final isPlaying = snapshot.data?.playing ?? false;
+        return IconButton(
+          icon: Icon(
+            isPlaying ? Icons.pause : Icons.play_arrow,
+            size: 45,
+          ),
+          onPressed: () {
+            if (isPlaying) {
+              widget.audioHandler.pause();
+            } else {
+              widget.audioHandler.play();
+            }
+          },
+        );
+      },
+    ),
+    IconButton(
+      onPressed: () {
+        widget.audioHandler.playNext();
+      },
+      icon: const Icon(Icons.skip_next),
+      iconSize: 32.0,
+    ),
+    IconButton(
+      onPressed: () {
+        widget.audioHandler.seek(
+          widget.audioHandler.position + const Duration(seconds: 10)
+        );
+      },
+      icon: const Icon(Icons.forward_10),
+      iconSize: 32.0,
+    ),
+  ],
+)
+```
+</CodeGroup>
+
+## Volume Control
+
+Precise volume adjustment with visual feedback:
+
+<CodeGroup>
+```dart Volume Control (controls.dart:78-117)
+void _changeVolume() {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setModalState) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const Text('Adjust Volume'),
+            Slider(
+              value: _volume,
+              min: 0.0,
+              max: 1.0,
+              divisions: 10,
+              label: "${(_volume * 100).toInt()}%",
+              onChanged: (value) {
+                setModalState(() => _volume = value);
+                setState(() {
+                  widget.audioHandler.setVolume(_volume);
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+```
+</CodeGroup>
+
+<Check>
+All player controls work seamlessly in the background and persist across app restarts!
+</Check>
+
+<Card title="Next Steps" icon="arrow-right" href="/features/downloads">
+  Learn about downloading audiobooks for offline playback
+</Card>

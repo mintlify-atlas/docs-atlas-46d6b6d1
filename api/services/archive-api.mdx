@@ -1,0 +1,205 @@
+---
+title: 'ArchiveApi'
+description: 'Service for fetching audiobooks from Archive.org'
+---
+
+The `ArchiveApi` class provides methods to query the Archive.org API for LibriVox audiobooks with support for language filtering, genre categorization, and search functionality.
+
+## Overview
+
+This service handles:
+- Fetching latest, most viewed, and most downloaded audiobooks
+- Genre-based filtering with multi-language support
+- Search functionality with language preferences
+- HTTP caching with ETags and conditional requests
+- Multi-language subject indexing for improved categorization
+
+**Source:** `lib/resources/archive_api.dart`
+
+## Public Methods
+
+### getLatestAudiobook
+
+Fetches the most recently added audiobooks from the LibriVox collection.
+
+<ParamField path="page" type="int" required>
+  Page number for pagination (1-based)
+</ParamField>
+
+<ParamField path="rows" type="int" required>
+  Number of results per page
+</ParamField>
+
+**Returns:** `Future<Either<String, List<Audiobook>>>`
+
+**Example:**
+```dart
+final archiveApi = ArchiveApi();
+final result = await archiveApi.getLatestAudiobook(1, 20);
+
+result.fold(
+  (error) => print('Error: $error'),
+  (audiobooks) => print('Found ${audiobooks.length} audiobooks'),
+);
+```
+
+### getMostViewedWeeklyAudiobook
+
+Retrieves audiobooks sorted by weekly view count.
+
+<ParamField path="page" type="int" required>
+  Page number for pagination
+</ParamField>
+
+<ParamField path="rows" type="int" required>
+  Number of results per page
+</ParamField>
+
+**Returns:** `Future<Either<String, List<Audiobook>>>`
+
+**Example:**
+```dart
+final result = await archiveApi.getMostViewedWeeklyAudiobook(1, 20);
+```
+
+### getMostDownloadedEverAudiobook
+
+Fetches audiobooks sorted by total download count.
+
+<ParamField path="page" type="int" required>
+  Page number for pagination
+</ParamField>
+
+<ParamField path="rows" type="int" required>
+  Number of results per page
+</ParamField>
+
+**Returns:** `Future<Either<String, List<Audiobook>>>`
+
+**Example:**
+```dart
+final result = await archiveApi.getMostDownloadedEverAudiobook(1, 20);
+```
+
+### getAudiobooksByGenre
+
+Fetches audiobooks filtered by genre with support for multi-language subjects.
+
+<ParamField path="genre" type="String" required>
+  Genre identifier (e.g., 'mystery', 'scifi', 'romance'). Supports OR queries.
+</ParamField>
+
+<ParamField path="page" type="int" required>
+  Page number for pagination
+</ParamField>
+
+<ParamField path="rows" type="int" required>
+  Number of results per page
+</ParamField>
+
+<ParamField path="sortBy" type="String" required>
+  Sort field (e.g., 'downloads', 'week', 'addeddate')
+</ParamField>
+
+**Returns:** `Future<Either<String, List<Audiobook>>>`
+
+**Example:**
+```dart
+final result = await archiveApi.getAudiobooksByGenre(
+  'mystery OR crime',
+  1,
+  20,
+  'downloads',
+);
+```
+
+### getAudiobookFiles
+
+Retrieves the audio files and metadata for a specific audiobook.
+
+<ParamField path="identifier" type="String" required>
+  Archive.org identifier for the audiobook
+</ParamField>
+
+**Returns:** `Future<Either<String, List<AudiobookFile>>>`
+
+The method extracts:
+- Audio track files with original source
+- High-quality cover images (JPEG format)
+- Track numbers and metadata
+
+**Example:**
+```dart
+final result = await archiveApi.getAudiobookFiles('pride_prejudice_librivox');
+
+result.fold(
+  (error) => print('Error: $error'),
+  (files) {
+    for (final file in files) {
+      print('Track ${file.track}: ${file.title}');
+    }
+  },
+);
+```
+
+### searchAudiobook
+
+Searches for audiobooks using a free-form query string with language filtering.
+
+<ParamField path="searchQuery" type="String" required>
+  Search terms (will be URI encoded)
+</ParamField>
+
+<ParamField path="page" type="int" required>
+  Page number for pagination
+</ParamField>
+
+<ParamField path="rows" type="int" required>
+  Number of results per page
+</ParamField>
+
+**Returns:** `Future<Either<String, List<Audiobook>>>`
+
+**Example:**
+```dart
+final result = await archiveApi.searchAudiobook('Jane Austen', 1, 20);
+```
+
+## Language Support
+
+The `ArchiveApi` automatically applies language filters based on user preferences stored in Hive (`language_prefs_box`). Supported languages include:
+
+- English (en), German (de), Spanish (es), French (fr)
+- Dutch (nl), Portuguese (pt), Italian (it), Russian (ru)
+- Greek (el), Japanese (ja), Polish (pl), Chinese (zh)
+- Hebrew (he), Latin (la), Finnish (fi), Swedish (sv)
+- Catalan (ca), Danish (da), Esperanto (eo)
+- And more (see `_langAliases` mapping in source)
+
+## HTTP Caching
+
+The service implements HTTP caching with:
+- ETag-based conditional requests
+- Last-Modified headers
+- 15-minute staleness window
+- LRU cache eviction (max 100 entries)
+
+## Genre Filtering
+
+Genre filtering uses comprehensive regex-based category filters across multiple languages. Available genres include:
+
+- `war`, `adventure`, `biography`, `children`, `comedy`
+- `crime`, `fantasy`, `horror`, `love`, `mystery`
+- `philosophy`, `poem`, `religion`, `romance`, `scifi`
+
+Each genre is mapped to subject keywords in 20+ languages for accurate cross-lingual discovery.
+
+## Static Methods
+
+### dispose
+
+Closes the HTTP client connection. Should be called when the app shuts down.
+
+```dart
+ArchiveApi.dispose();
+```

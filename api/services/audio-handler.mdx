@@ -1,0 +1,340 @@
+---
+title: 'AudioHandler'
+description: 'Audio playback handler using audio_service and just_audio'
+---
+
+The audio handler provides background audio playback capabilities with media controls, ChromeCast support, and persistent playback state.
+
+## Overview
+
+Aradia uses two classes for audio handling:
+- `AudioHandlerProvider` - Provider wrapper for initializing the audio service
+- `MyAudioHandler` - Core audio playback implementation
+
+**Source Files:**
+- `lib/resources/services/audio_handler_provider.dart`
+- `lib/resources/services/my_audio_handler.dart`
+
+---
+
+## AudioHandlerProvider
+
+A `ChangeNotifier` that wraps `MyAudioHandler` and manages initialization.
+
+### initialize
+
+Initializes the audio service with Android notification configuration.
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+final provider = AudioHandlerProvider();
+await provider.initialize();
+final handler = provider.audioHandler;
+```
+
+### audioHandler
+
+Getter that returns the initialized `MyAudioHandler` instance.
+
+**Returns:** `MyAudioHandler`
+
+---
+
+## MyAudioHandler
+
+Extends `BaseAudioHandler` from `audio_service` package to provide full-featured audio playback.
+
+### initSongs
+
+Initializes the audio queue with audiobook files and prepares playback.
+
+<ParamField path="files" type="List<AudiobookFile>" required>
+  List of audio files to play
+</ParamField>
+
+<ParamField path="audiobook" type="Audiobook" required>
+  Audiobook metadata
+</ParamField>
+
+<ParamField path="initialIndex" type="int" required>
+  Track index to start playback (0-based)
+</ParamField>
+
+<ParamField path="positionInMilliseconds" type="int" required>
+  Starting position within the track in milliseconds
+</ParamField>
+
+**Returns:** `Future<void>`
+
+This method:
+- Builds `MediaItem` queue for notification display
+- Creates `AudioSource` list (supports YouTube, local files, and remote URLs)
+- Handles chapter-based clipping using `ClippingAudioSource`
+- Configures audio session for music playback
+- Loads audiobook to ChromeCast if connected
+- Persists state to Hive for resume capability
+
+**Example:**
+```dart
+await audioHandler.initSongs(
+  audiobookFiles,
+  audiobook,
+  0, // start at first track
+  0, // start at beginning
+);
+```
+
+### play
+
+Starts or resumes playback. Routes to ChromeCast if connected.
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.play();
+```
+
+### pause
+
+Pauses playback and saves current position.
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.pause();
+```
+
+### stop
+
+Stops playback completely and persists final state.
+
+**Returns:** `Future<void>`
+
+### seek
+
+Seeks to a specific position in the current track.
+
+<ParamField path="position" type="Duration" required>
+  Target position to seek to
+</ParamField>
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.seek(Duration(minutes: 5));
+```
+
+### skipToNext
+
+Skips to the next track in the queue.
+
+**Returns:** `Future<void>`
+
+### skipToPrevious
+
+Skips to the previous track in the queue.
+
+**Returns:** `Future<void>`
+
+### skipToQueueItem
+
+Jumps to a specific track in the queue.
+
+<ParamField path="index" type="int" required>
+  Queue index to jump to
+</ParamField>
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.skipToQueueItem(5); // Jump to track 6
+```
+
+### fastForward
+
+Seeks forward by 15 seconds.
+
+**Returns:** `Future<void>`
+
+### rewind
+
+Seeks backward by 10 seconds.
+
+**Returns:** `Future<void>`
+
+### setSpeed
+
+Sets playback speed.
+
+<ParamField path="speed" type="double" required>
+  Playback speed multiplier (e.g., 1.0 = normal, 1.5 = 1.5x speed)
+</ParamField>
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.setSpeed(1.5); // 1.5x speed
+```
+
+### setVolume
+
+Sets the playback volume.
+
+<ParamField path="volume" type="double" required>
+  Volume level from 0.0 (mute) to 1.0 (max)
+</ParamField>
+
+**Returns:** `Future<void>`
+
+### setSkipSilence
+
+Enables or disables silence skipping.
+
+<ParamField path="skipSilence" type="bool" required>
+  Whether to skip silent sections
+</ParamField>
+
+**Returns:** `Future<void>`
+
+### getPositionStream
+
+Returns a stream of position updates for progress tracking.
+
+**Returns:** `Stream<PositionData>`
+
+**Example:**
+```dart
+audioHandler.getPositionStream().listen((data) {
+  print('Position: ${data.position}');
+  print('Buffered: ${data.bufferedPosition}');
+  print('Duration: ${data.duration}');
+});
+```
+
+## Audio Effects (Android)
+
+### setEqualizerBand
+
+Sets the gain level for a specific equalizer band (Android only).
+
+<ParamField path="bandIndex" type="int" required>
+  Band index: 0 (60Hz), 1 (230Hz), 2 (910Hz), 3 (4kHz), 4 (14kHz)
+</ParamField>
+
+<ParamField path="gain" type="double" required>
+  Gain in decibels, clamped to -15.0 to +15.0 dB
+</ParamField>
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.setEqualizerBand(2, 5.0); // Boost 910Hz by 5dB
+```
+
+### setEqualizerEnabled
+
+Enables or disables the equalizer (Android only).
+
+<ParamField path="enabled" type="bool" required>
+  Whether to enable the equalizer
+</ParamField>
+
+**Returns:** `Future<void>`
+
+### setBalance
+
+Sets the left/right audio balance.
+
+<ParamField path="balance" type="double" required>
+  Balance from -1.0 (left) to +1.0 (right), 0.0 = center
+</ParamField>
+
+**Returns:** `Future<void>`
+
+### setPitch
+
+Adjusts the audio pitch without changing speed.
+
+<ParamField path="pitch" type="double" required>
+  Pitch multiplier (e.g., 1.0 = normal pitch)
+</ParamField>
+
+**Returns:** `Future<void>`
+
+### setLoudnessEnhancer
+
+Sets the loudness enhancer gain (Android only).
+
+<ParamField path="targetGain" type="double" required>
+  Target gain in millibels, clamped to 0.0-1000.0
+</ParamField>
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.setLoudnessEnhancer(500.0); // Moderate enhancement
+```
+
+### getEqualizerParameters
+
+Retrieves current equalizer parameters (Android only).
+
+**Returns:** `Future<AndroidEqualizerParameters?>`
+
+## Utility Methods
+
+### getCurrentAudiobookId
+
+Returns the identifier of the currently playing audiobook.
+
+**Returns:** `String?`
+
+### getAudioSourcesFromPlaylist
+
+Returns the list of audio sources in the current queue.
+
+**Returns:** `List<AudioSource>`
+
+### restoreIfNeeded
+
+Restores the playback queue from Hive storage on cold start without auto-playing.
+
+**Returns:** `Future<void>`
+
+**Example:**
+```dart
+await audioHandler.restoreIfNeeded(); // Restore last session
+```
+
+## ChromeCast Support
+
+The audio handler integrates with `ChromeCastService` via the `chromeCastService` getter. When a ChromeCast device is connected, playback commands are automatically routed to the cast device.
+
+**Access ChromeCast service:**
+```dart
+final castService = audioHandler.chromeCastService;
+if (castService.isConnected) {
+  // Handle ChromeCast-specific UI
+}
+```
+
+## Persistence
+
+Playback state is automatically saved to Hive (`playing_audiobook_details_box`) including:
+- Current audiobook and files
+- Track index and position
+- Playback history
+
+State is persisted:
+- Every 10 seconds during playback
+- When changing tracks
+- On pause/stop operations

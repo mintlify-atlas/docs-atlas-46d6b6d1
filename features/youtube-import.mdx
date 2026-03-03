@@ -1,0 +1,391 @@
+---
+title: 'YouTube Import'
+description: 'Import individual videos or entire playlists from YouTube as audiobooks'
+icon: 'youtube'
+---
+
+## Overview
+
+Aradia can import audio from YouTube videos and playlists, making them available as audiobooks. This feature is perfect for lectures, podcasts, or any long-form audio content on YouTube.
+
+## Import Features
+
+<CardGroup cols={2}>
+  <Card title="Single Videos" icon="video">
+    Import individual YouTube videos as standalone audiobooks
+  </Card>
+  <Card title="Playlists" icon="list">
+    Import entire playlists with all videos as chapters
+  </Card>
+  <Card title="WebView Browser" icon="globe">
+    Built-in YouTube browser for easy navigation
+  </Card>
+  <Card title="Metadata Extraction" icon="tags">
+    Automatic extraction of title, author, and description
+  </Card>
+</CardGroup>
+
+## YouTube WebView
+
+The app includes a built-in YouTube browser powered by `flutter_inappwebview`:
+
+<CodeGroup>
+```dart WebView Setup (youtube_webview.dart:293-313)
+InAppWebView(
+  keepAlive: Provider.of<WebViewKeepAliveProvider>(context, listen: false)
+      .keepAlive,
+  initialUrlRequest: URLRequest(
+    url: WebUri('https://www.youtube.com')
+  ),
+  onWebViewCreated: (controller) async {
+    _webViewController = controller;
+    final url = await controller.getUrl();
+    if (url != null && url.toString() != 'about:blank') {
+      if (mounted) {
+        setState(() {
+          _currentUrl = url.toString();
+          _isWebViewLoading = false;
+          _checkIfCurrentContentIsImported();
+        });
+      }
+    }
+  },
+  // ... URL tracking handlers
+)
+```
+</CodeGroup>
+
+### URL Tracking
+
+The WebView tracks navigation to detect when a user is on a video or playlist page:
+
+<CodeGroup>
+```dart URL Detection (youtube_webview.dart:314-338)
+onLoadStop: (controller, url) {
+  if (mounted) {
+    setState(() {
+      _isWebViewLoading = false;
+      _currentUrl = url.toString();
+      _checkIfCurrentContentIsImported();
+    });
+  }
+},
+onUpdateVisitedHistory: (controller, url, androidIsReload) {
+  if (mounted && url != null) {
+    setState(() {
+      _currentUrl = url.toString();
+      _checkIfCurrentContentIsImported();
+    });
+  }
+}
+```
+</CodeGroup>
+
+<Info>
+The import button only appears when viewing a YouTube video or playlist page.
+</Info>
+
+## Import Process
+
+<Steps>
+  <Step title="Navigate to Content">
+    Browse YouTube and navigate to a video or playlist:
+    
+    ```dart URL Validation (youtube_webview.dart:96-101)
+    if (!_currentUrl!.contains('youtube.com/watch') &&
+        !_currentUrl!.contains('youtube.com/playlist')) {
+      setState(() => _errorMessageYT =
+          'Please navigate to a YouTube video or playlist page');
+      return;
+    }
+    ```
+  </Step>
+  
+  <Step title="Extract Metadata">
+    The app extracts video/playlist information using `youtube_explode_dart`:
+    
+    <Tabs>
+      <Tab title="Single Video">
+        ```dart Video Import (youtube_webview.dart:152-175)
+        final video = await yt.videos.get(_currentUrl!);
+        entityId = video.id.value;
+        entityTitle = video.title;
+        entityAuthor = video.author;
+        entityDescription = video.description;
+        tags = _extractTags(video.description);
+        coverImage = video.thumbnails.highResUrl;
+
+        files.add(AudiobookFile.fromMap({
+          "identifier": video.id.value,
+          "title": video.title,
+          "name": "${video.id.value}.mp3",
+          "track": 1,
+          "size": 0,
+          "length": video.duration?.inSeconds.toDouble() ?? 0.0,
+          "url": video.url,
+          "highQCoverImage": video.thumbnails.highResUrl,
+        }));
+        ```
+      </Tab>
+      
+      <Tab title="Playlist">
+        ```dart Playlist Import (youtube_webview.dart:123-151)
+        final playlist = await yt.playlists.get(_currentUrl!);
+        entityId = playlist.id.value;
+        entityTitle = playlist.title;
+        entityAuthor = playlist.author;
+        entityDescription = playlist.description;
+        tags = _extractTags(playlist.description);
+
+        final videos = await yt.playlists
+            .getVideos(playlist.id)
+            .toList();
+        
+        if (videos.isEmpty) {
+          throw Exception("Playlist contains no videos.");
+        }
+
+        coverImage = videos.first.thumbnails.highResUrl;
+
+        for (var video in videos) {
+          files.add(AudiobookFile.fromMap({
+            "identifier": video.id.value,
+            "title": video.title,
+            "name": "${video.id.value}.mp3",
+            "track": files.length + 1,
+            "url": video.url,
+            "highQCoverImage": video.thumbnails.highResUrl,
+          }));
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Extract Tags">
+    Hashtags are automatically extracted from descriptions:
+    
+    ```dart Tag Extraction (youtube_webview.dart:204-214)
+    List<String> _extractTags(String description) {
+      final tags = <String>{};
+      final words = description.split(RegExp(r'\s+'));
+      for (final word in words) {
+        if (word.startsWith('#') && word.length > 1) {
+          final cleaned = word.substring(1)
+              .replaceAll(RegExp(r'[^\w-]'), '');
+          if (cleaned.isNotEmpty) tags.add(cleaned);
+        }
+      }
+      return tags.toList();
+    }
+    ```
+  </Step>
+  
+  <Step title="Create Audiobook">
+    Build the audiobook object with extracted metadata:
+    
+    ```dart Audiobook Creation (youtube_webview.dart:177-191)
+    final audiobook = Audiobook.fromMap({
+      "title": entityTitle,
+      "id": entityId,
+      "description": entityDescription,
+      "author": entityAuthor,
+      "date": DateTime.now().toIso8601String(),
+      "downloads": 0,
+      "subject": tags,
+      "size": 0,
+      "rating": 0.0,
+      "reviews": 0,
+      "lowQCoverImage": coverImage,
+      "language": "en",
+      "origin": AppConstants.youtubeDirName,
+    });
+    ```
+  </Step>
+  
+  <Step title="Save Metadata">
+    Store audiobook and file metadata locally:
+    
+    ```dart Metadata Storage (youtube_webview.dart:216-230)
+    Future<void> _saveYouTubeAudiobookMetadata(
+        Audiobook audiobook, List<AudiobookFile> files) async {
+      final appDir = await getExternalStorageDirectory();
+      if (appDir == null) {
+        throw Exception('Could not access storage directory');
+      }
+      
+      final audiobookDir = Directory(
+        p.join(appDir.path, AppConstants.youtubeDirName, audiobook.id)
+      );
+      await audiobookDir.create(recursive: true);
+
+      final metadataFile = File(
+        p.join(audiobookDir.path, 'audiobook.txt')
+      );
+      await metadataFile.writeAsString(
+        jsonEncode(audiobook.toMap())
+      );
+
+      final filesFile = File(
+        p.join(audiobookDir.path, 'files.txt')
+      );
+      await filesFile.writeAsString(
+        jsonEncode(files.map((f) => f.toJson()).toList())
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Duplicate Detection
+
+The app prevents re-importing already imported content:
+
+<CodeGroup>
+```dart Duplicate Check (youtube_webview.dart:53-84)
+void _checkIfCurrentContentIsImported() {
+  if (_currentUrl == null) {
+    _isCurrentContentImported = false;
+    return;
+  }
+
+  try {
+    String? entityId;
+
+    if (_currentUrl!.contains('playlist?list=')) {
+      final uri = Uri.parse(_currentUrl!);
+      entityId = uri.queryParameters['list'];
+    } else if (_currentUrl!.contains('youtube.com/watch')) {
+      final uri = Uri.parse(_currentUrl!);
+      entityId = uri.queryParameters['v'];
+    }
+
+    if (entityId != null) {
+      final wasImported = _isCurrentContentImported;
+      _isCurrentContentImported =
+          _audioBookNotifier.isAudiobookAlreadyImported(entityId);
+
+      if (wasImported != _isCurrentContentImported) {
+        setState(() {});
+      }
+    } else {
+      _isCurrentContentImported = false;
+    }
+  } catch (e) {
+    _isCurrentContentImported = false;
+  }
+}
+```
+</CodeGroup>
+
+## Import Button
+
+The floating action button adapts based on import status:
+
+<CodeGroup>
+```dart Import FAB (youtube_webview.dart:364-384)
+floatingActionButton: _currentUrl != null &&
+        (_currentUrl!.contains('youtube.com/watch') ||
+            _currentUrl!.contains('youtube.com/playlist'))
+    ? FloatingActionButton(
+        heroTag: 'import',
+        backgroundColor: AppColors.primaryColor,
+        onPressed: _isImporting
+            ? null
+            : _isCurrentContentImported
+                ? () => context.go('/home')
+                : _importFromYouTube,
+        child: _isImporting
+            ? const CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              )
+            : _isCurrentContentImported
+                ? const Icon(Icons.check_circle, color: Colors.white)
+                : const Icon(Icons.add_to_queue, color: Colors.white),
+      )
+    : null,
+```
+</CodeGroup>
+
+<CardGroup cols={3}>
+  <Card title="Not Imported" icon="plus">
+    Shows add icon when content hasn't been imported
+  </Card>
+  <Card title="Importing" icon="spinner">
+    Shows loading spinner during import
+  </Card>
+  <Card title="Imported" icon="check">
+    Shows checkmark if already imported
+  </Card>
+</CardGroup>
+
+## WebView Keep-Alive
+
+The WebView state persists across navigation:
+
+<CodeGroup>
+```dart Keep-Alive Provider (youtube_webview.dart:293-296)
+InAppWebView(
+  keepAlive: Provider.of<WebViewKeepAliveProvider>(context, listen: false)
+      .keepAlive,
+  // ...
+)
+```
+</CodeGroup>
+
+<Tip>
+The WebView maintains your browsing session even when navigating away from the import screen.
+</Tip>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Invalid URL" icon="triangle-exclamation">
+    ```dart
+    if (!_currentUrl!.contains('youtube.com/watch') &&
+        !_currentUrl!.contains('youtube.com/playlist')) {
+      setState(() => _errorMessageYT =
+          'Please navigate to a YouTube video or playlist page');
+      return;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Empty Playlist" icon="list-check">
+    ```dart
+    if (videos.isEmpty) {
+      throw Exception("Playlist contains no videos.");
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="General Errors" icon="bug">
+    ```dart
+    catch (e) {
+      if (mounted) {
+        setState(() => _errorMessageYT = 
+            'Error importing from YouTube: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Playback
+
+Imported YouTube audiobooks are streamed on-demand:
+
+<Warning>
+**No Pre-Download Required**: YouTube imports stream audio directly without downloading. Use the download feature if you need offline access.
+</Warning>
+
+<Check>
+YouTube imports support all standard player features including speed control, sleep timer, and Chromecast!
+</Check>
+
+<Card title="Next Steps" icon="arrow-right" href="/features/local-audiobooks">
+  Learn how to import audiobooks from local storage
+</Card>

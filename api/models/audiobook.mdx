@@ -1,0 +1,256 @@
+---
+title: Audiobook
+description: Core model representing an audiobook from LibriVox/Archive.org
+---
+
+## Overview
+
+The `Audiobook` class represents an audiobook retrieved from LibriVox via the Archive.org API. It contains metadata such as title, author, description, ratings, and more.
+
+## Properties
+
+<ResponseField name="title" type="String" required>
+  The title of the audiobook
+</ResponseField>
+
+<ResponseField name="id" type="String" required>
+  The unique identifier for the audiobook (Archive.org identifier)
+</ResponseField>
+
+<ResponseField name="description" type="String?">
+  A text description of the audiobook
+</ResponseField>
+
+<ResponseField name="totalTime" type="String?">
+  The total runtime of the audiobook
+</ResponseField>
+
+<ResponseField name="author" type="String?">
+  The author or creator of the audiobook
+</ResponseField>
+
+<ResponseField name="date" type="DateTime?">
+  The publication or upload date
+</ResponseField>
+
+<ResponseField name="downloads" type="int?">
+  The number of times the audiobook has been downloaded
+</ResponseField>
+
+<ResponseField name="subject" type="List<dynamic>?">
+  A list of subject tags or categories for the audiobook. Filters out generic tags like "librivox", "audiobooks", and "audiobook"
+</ResponseField>
+
+<ResponseField name="size" type="int?">
+  The total size of the audiobook in bytes
+</ResponseField>
+
+<ResponseField name="rating" type="double?">
+  The average user rating for the audiobook
+</ResponseField>
+
+<ResponseField name="reviews" type="int?">
+  The number of reviews the audiobook has received
+</ResponseField>
+
+<ResponseField name="lowQCoverImage" type="String" required>
+  URL to the audiobook cover image. Constructed from Archive.org's image service using the identifier
+</ResponseField>
+
+<ResponseField name="language" type="String?">
+  The language code of the audiobook (e.g., "en" for English)
+</ResponseField>
+
+<ResponseField name="origin" type="String?">
+  The source of the audiobook (typically "librivox")
+</ResponseField>
+
+## Constructors
+
+### Audiobook.empty()
+
+Creates an empty audiobook instance with default values.
+
+```dart
+Audiobook emptyBook = Audiobook.empty();
+// Returns an Audiobook with empty strings and zero values
+```
+
+### Audiobook.fromJson(Map jsonAudiobook)
+
+Creates an `Audiobook` instance from a JSON map retrieved from the Archive.org API.
+
+**Parameters:**
+
+<ParamField path="jsonAudiobook" type="Map" required>
+  A map containing audiobook data from the Archive.org API response
+</ParamField>
+
+**JSON Field Mappings:**
+
+- `identifier` → `id`
+- `title` → `title`
+- `runtime` → `totalTime`
+- `creator` → `author` (defaults to "Unknown")
+- `date` → `date` (parsed to DateTime)
+- `downloads` → `downloads`
+- `subject` → `subject` (filtered)
+- `item_size` → `size`
+- `avg_rating` → `rating`
+- `num_reviews` → `reviews`
+- `description` → `description`
+- `language` → `language` (defaults to "en")
+
+```dart
+Map<String, dynamic> jsonData = {
+  "identifier": "book123",
+  "title": "Pride and Prejudice",
+  "creator": "Jane Austen",
+  "runtime": "11:00:00",
+  "downloads": 5000,
+  "avg_rating": "4.5"
+};
+
+Audiobook book = Audiobook.fromJson(jsonData);
+```
+
+### Audiobook.fromMap
+
+Creates an `Audiobook` instance from a map (typically used for local storage retrieval).
+
+**Parameters:**
+
+<ParamField path="map" type="Map" required>
+  A map containing audiobook data in the internal format (Map&lt;dynamic, dynamic&gt;)
+</ParamField>
+
+```dart
+Map<String, dynamic> map = {
+  "id": "book123",
+  "title": "Pride and Prejudice",
+  "author": "Jane Austen",
+  "date": "2020-01-01T00:00:00.000Z",
+  "rating": "4.5"
+};
+
+Audiobook book = Audiobook.fromMap(map);
+```
+
+## Methods
+
+### toMap()
+
+Converts the audiobook to a map suitable for storage.
+
+**Returns:** `Map<dynamic, dynamic>`
+
+```dart
+Audiobook book = Audiobook.fromJson(jsonData);
+Map<dynamic, dynamic> map = book.toMap();
+```
+
+### toJson()
+
+Converts the audiobook to a JSON-serializable map.
+
+**Returns:** `Map<String, dynamic>`
+
+```dart
+Audiobook book = Audiobook.fromJson(jsonData);
+Map<String, dynamic> json = book.toJson();
+```
+
+### copyWith
+
+Creates a copy of the audiobook with optionally updated fields.
+
+**Parameters:**
+
+<ParamField path="title" type="String?">
+  Updated title
+</ParamField>
+
+<ParamField path="id" type="String?">
+  Updated identifier
+</ParamField>
+
+<ParamField path="description" type="String?">
+  Updated description
+</ParamField>
+
+<ParamField path="totalTime" type="String?">
+  Updated total time
+</ParamField>
+
+<ParamField path="author" type="String?">
+  Updated author
+</ParamField>
+
+<ParamField path="date" type="DateTime?">
+  Updated date
+</ParamField>
+
+<ParamField path="downloads" type="int?">
+  Updated download count
+</ParamField>
+
+<ParamField path="subject" type="List<String>?">
+  Updated subject list
+</ParamField>
+
+<ParamField path="size" type="int?">
+  Updated size
+</ParamField>
+
+<ParamField path="rating" type="double?">
+  Updated rating
+</ParamField>
+
+<ParamField path="reviews" type="int?">
+  Updated review count
+</ParamField>
+
+<ParamField path="lowQCoverImage" type="String?">
+  Updated cover image URL
+</ParamField>
+
+<ParamField path="language" type="String?">
+  Updated language code
+</ParamField>
+
+<ParamField path="origin" type="String?">
+  Updated origin
+</ParamField>
+
+**Returns:** `Audiobook`
+
+```dart
+Audiobook book = Audiobook.fromJson(jsonData);
+Audiobook updatedBook = book.copyWith(
+  rating: 5.0,
+  downloads: 6000
+);
+```
+
+## Static Methods
+
+### fromJsonArray(List jsonAudiobook)
+
+Converts a list of JSON objects into a list of `Audiobook` instances. Filters out invalid entries (thumbs, librivox creators, null titles).
+
+**Parameters:**
+
+<ParamField path="jsonAudiobook" type="List" required>
+  A list of JSON maps from the API response
+</ParamField>
+
+**Returns:** `List<Audiobook>`
+
+```dart
+List<dynamic> jsonArray = [
+  {"identifier": "book1", "title": "Book One", "creator": "Author One"},
+  {"identifier": "book2", "title": "Book Two", "creator": "Author Two"}
+];
+
+List<Audiobook> audiobooks = Audiobook.fromJsonArray(jsonArray);
+```

@@ -1,0 +1,476 @@
+---
+title: 'AudiobookPlayer Screen'
+description: 'Full-screen audio player with playback controls, sleep timer, and equalizer'
+---
+
+## Overview
+
+The `AudiobookPlayer` screen is a full-screen audio player interface that provides comprehensive playback controls, sleep timer functionality, equalizer settings, track selection, and Chromecast support. It displays the currently playing audiobook with cover art, metadata, and interactive controls.
+
+**File Location**: `lib/screens/audiobook_player/audiobook_player.dart`
+
+## Purpose and Functionality
+
+The AudiobookPlayer screen provides:
+
+- Full-screen playback interface with modern glassmorphism design
+- Real-time playback progress tracking and seeking
+- Sleep timer with preset durations and end-of-track option
+- Audio equalizer with customizable presets
+- Track/chapter selection dialog
+- Chromecast integration for remote playback
+- Skip silence functionality
+- Background playback support with notifications
+- Adaptive UI for single-track vs multi-track audiobooks
+
+## Key Components
+
+### Services and Providers
+
+```dart
+late AudioHandlerProvider audioHandlerProvider;  // Audio playback management
+late Box<dynamic> playingAudiobookDetailsBox;    // Hive storage for playback state
+late Audiobook audiobook;                         // Currently playing audiobook
+late List<AudiobookFile> audiobookFiles;          // Audio file chapters
+late CharacterService characterService;           // Character metadata service
+```
+
+### State Management
+
+Uses ValueNotifiers and StreamSubscriptions for reactive UI updates:
+
+```dart
+final ValueNotifier<bool> _skipSilenceNotifier = ValueNotifier<bool>(false);
+late final OptimizedTimer _sleepTimer;
+StreamSubscription<PositionData>? _positionSubscription;
+bool _isEndOfTrackTimerActive = false;
+```
+
+### Global Keys
+
+```dart
+final GlobalKey<EqualizerIconState> _equalizerIconKey = GlobalKey<EqualizerIconState>();
+```
+Used to refresh the equalizer icon when settings change.
+
+## Widget Structure
+
+The screen uses a `StreamBuilder<MediaItem?>` to reactively rebuild when the current track changes:
+
+1. **App Bar** (dark theme with artwork thumbnail)
+   - Mini cover art thumbnail
+   - Track title and artist/author
+   - Chromecast button
+   - Equalizer button
+   - Track list button
+   - Collapse button
+
+2. **Body** (gradient background)
+   - Large cover art with hero animation (280x280)
+   - Title section with proper typography
+   - Album name (for multi-track audiobooks)
+   - Artist/author name
+   - Progress bar with seek functionality
+   - Controls container (glassmorphism card)
+     - Playback controls
+     - Speed control
+     - Sleep timer button
+     - Skip silence toggle
+
+## Sleep Timer Functionality
+
+### Timer Durations
+
+Predefined timer options:
+
+```dart
+TimerDurations.fifteenMinutes   // 15 minutes
+TimerDurations.thirtyMinutes    // 30 minutes
+TimerDurations.fortyFiveMinutes // 45 minutes
+TimerDurations.oneHour          // 60 minutes
+TimerDurations.ninetyMinutes    // 90 minutes
+TimerDurations.endOfTrack       // Pauses at end of current chapter
+```
+
+### Starting a Timer
+
+```dart
+Future<void> startTimer(Duration duration) async {
+  if (duration == TimerDurations.endOfTrack) {
+    await _startEndOfTrackTimer();
+    return;
+  }
+
+  const androidConfig = FlutterBackgroundAndroidConfig(
+    notificationTitle: "Audiobook Timer Running",
+    notificationText: "The timer will pause playback when it expires.",
+    notificationImportance: AndroidNotificationImportance.max,
+  );
+
+  final result = await FlutterBackground.initialize(androidConfig: androidConfig);
+  if (result) {
+    await FlutterBackground.enableBackgroundExecution();
+
+    _sleepTimer.start(
+      duration: duration,
+      onExpired: () {
+        audioHandlerProvider.audioHandler.pause();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Timer expired! Audiobook paused.')),
+          );
+        }
+        FlutterBackground.disableBackgroundExecution();
+      },
+    );
+  }
+}
+```
+
+### End-of-Track Timer
+
+```dart
+Future<void> _startEndOfTrackTimer() async {
+  _isEndOfTrackTimerActive = true;
+  Duration? lastKnownDuration;
+  Duration? lastKnownPosition;
+
+  const androidConfig = FlutterBackgroundAndroidConfig(
+    notificationTitle: "End of Track Timer Running",
+    notificationText: "The timer will pause playback at the end of current track.",
+    notificationImportance: AndroidNotificationImportance.max,
+  );
+
+  final result = await FlutterBackground.initialize(androidConfig: androidConfig);
+  if (result) {
+    await FlutterBackground.enableBackgroundExecution();
+
+    _positionSubscription = audioHandlerProvider.audioHandler
+        .getPositionStream()
+        .listen((positionData) {
+      if (_isEndOfTrackTimerActive && positionData.duration > Duration.zero) {
+        final positionChanged = lastKnownPosition == null ||
+            (positionData.position - lastKnownPosition!).abs() >
+                const Duration(seconds: 2);
+        final durationChanged = lastKnownDuration != positionData.duration;
+
+        if (positionChanged || durationChanged) {
+          lastKnownPosition = positionData.position;
+          lastKnownDuration = positionData.duration;
+
+          final remainingTime = positionData.duration - positionData.position;
+
+          if (remainingTime > Duration.zero) {
+            _sleepTimer.start(
+              duration: remainingTime,
+              onExpired: () {
+                audioHandlerProvider.audioHandler.pause();
+                _isEndOfTrackTimerActive = false;
+                FlutterBackground.disableBackgroundExecution();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Track ended! Audiobook paused.')),
+                  );
+                }
+              },
+            );
+          }
+        }
+      }
+    });
+  }
+}
+```
+
+### Canceling Timer
+
+```dart
+void cancelTimer() {
+  _sleepTimer.cancel();
+  _isEndOfTrackTimerActive = false;
+  _positionSubscription?.cancel();
+  FlutterBackground.disableBackgroundExecution();
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Sleep timer canceled.')),
+  );
+}
+```
+
+## Code Examples
+
+### Artwork Helpers (Local and Remote)
+
+```dart
+Widget _artThumb(Uri? art, {double size = 50}) {
+  final isLocal = art != null && art.scheme == 'file';
+  return SizedBox(
+    width: size,
+    height: size,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: isLocal
+          ? Image.file(File(art.toFilePath()), fit: BoxFit.cover)
+          : CachedNetworkImage(
+              imageUrl: art?.toString() ?? '',
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) =>
+                  const Icon(Icons.broken_image, color: Colors.white54),
+            ),
+    ),
+  );
+}
+
+Widget _artLarge(Uri? art, {double size = 250}) {
+  final isLocal = art != null && art.scheme == 'file';
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: isLocal
+        ? Image.file(File(art.toFilePath()),
+            fit: BoxFit.cover, height: size, width: size)
+        : CachedNetworkImage(
+            imageUrl: art?.toString() ?? '',
+            fit: BoxFit.cover,
+            height: size,
+            width: size,
+            errorWidget: (_, __, ___) => const Icon(Icons.error),
+          ),
+  );
+}
+```
+
+### Track Selection Dialog
+
+```dart
+void _showTrackSelectionDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => TrackSelectionDialog(
+      audioHandler: audioHandlerProvider.audioHandler,
+    ),
+  );
+}
+```
+
+### Equalizer Dialog
+
+```dart
+void _showEqualizerDialog(BuildContext context) async {
+  await showDialog(
+    context: context,
+    builder: (context) => EqualizerDialog(
+      audioHandler: audioHandlerProvider.audioHandler,
+    ),
+  );
+  // Refresh the equalizer icon after dialog closes
+  _equalizerIconKey.currentState?.refresh();
+}
+```
+
+### Timer Options Bottom Sheet
+
+```dart
+void showTimerOptions(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardColor : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text("Set a Sleep Timer",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              )),
+          const SizedBox(height: 15),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              _timerButton(context, "15 min", TimerDurations.fifteenMinutes),
+              _timerButton(context, "30 min", TimerDurations.thirtyMinutes),
+              _timerButton(context, "45 min", TimerDurations.fortyFiveMinutes),
+              _timerButton(context, "60 min", TimerDurations.oneHour),
+              _timerButton(context, "90 min", TimerDurations.ninetyMinutes),
+              _endOfTrackTimerButton(context),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
+    ),
+  );
+}
+```
+
+### Adaptive Title Display
+
+```dart
+// Determine titles based on single vs multi-track audiobook
+final box = playingAudiobookDetailsBox;
+final filesDyn = box.get('audiobookFiles') as List?;
+final isSingleTrack = (filesDyn?.length ?? 0) <= 1;
+
+String? authorFromBox;
+final audiobookMap = box.get('audiobook');
+if (audiobookMap != null) {
+  authorFromBox = Audiobook.fromMap(
+    Map<String, dynamic>.from(audiobookMap as Map),
+  ).author;
+}
+
+final headerTitle = isSingleTrack
+    ? (mediaItem.album ?? mediaItem.title)
+    : mediaItem.title;
+final headerSubtitle = isSingleTrack
+    ? (authorFromBox ?? mediaItem.artist ?? 'Unknown')
+    : (mediaItem.artist ?? 'Unknown');
+final contentTitle = headerTitle;
+```
+
+### Controls with Nested ValueListenableBuilders
+
+```dart
+ValueListenableBuilder<bool>(
+  valueListenable: _sleepTimer.isActive,
+  builder: (context, isTimerActive, child) {
+    return ValueListenableBuilder<Duration?>(
+      valueListenable: _sleepTimer.remainingTime,
+      builder: (context, activeTimerDuration, child) {
+        return ValueListenableBuilder<bool>(
+          valueListenable: _skipSilenceNotifier,
+          builder: (context, skipSilence, child) {
+            return Controls(
+              audioHandler: audioHandlerProvider.audioHandler,
+              onTimerPressed: showTimerOptions,
+              isTimerActive: isTimerActive,
+              activeTimerDuration: activeTimerDuration,
+              onCancelTimer: cancelTimer,
+              onToggleSkipSilence: () {
+                final newValue = !_skipSilenceNotifier.value;
+                _skipSilenceNotifier.value = newValue;
+                audioHandlerProvider.audioHandler.setSkipSilence(newValue);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    duration: const Duration(seconds: 1),
+                    content: Text(
+                      newValue ? 'Skip Silence Enabled' : 'Skip Silence Disabled',
+                    ),
+                  ),
+                );
+              },
+              skipSilence: skipSilence,
+            );
+          },
+        );
+      },
+    );
+  },
+)
+```
+
+## Lifecycle Management
+
+### Initialization
+
+```dart
+@override
+void initState() {
+  super.initState();
+  playingAudiobookDetailsBox = Hive.box('playing_audiobook_details_box');
+  _sleepTimer = OptimizedTimer();
+  characterService = CharacterService();
+  _initializeCharacterService();
+}
+
+Future<void> _initializeCharacterService() async {
+  await characterService.init();
+}
+```
+
+### Dependency Injection
+
+```dart
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+
+  audiobook = Audiobook.fromMap(playingAudiobookDetailsBox.get('audiobook'));
+
+  final audiobookFilesData =
+      playingAudiobookDetailsBox.get('audiobookFiles') as List;
+  audiobookFiles = audiobookFilesData
+      .map((fileData) => AudiobookFile.fromMap(fileData))
+      .toList();
+
+  audioHandlerProvider = Provider.of<AudioHandlerProvider>(context);
+  
+  if (audioHandlerProvider.audioHandler
+      .getAudioSourcesFromPlaylist()
+      .isEmpty) {
+    audioHandlerProvider.audioHandler.restoreIfNeeded();
+  }
+
+  _skipSilenceNotifier.value = _skipSilence;
+}
+```
+
+### Disposal
+
+```dart
+@override
+void dispose() {
+  _sleepTimer.dispose();
+  _skipSilenceNotifier.dispose();
+  _positionSubscription?.cancel();
+  super.dispose();
+}
+```
+
+## Dependencies
+
+- `audio_service` - Background audio playback
+- `provider` - Dependency injection
+- `hive` - Local storage
+- `we_slide` - Sliding panel container
+- `cached_network_image` - Image caching and display
+- `flutter_background` - Background execution for timer
+
+## Custom Widgets Used
+
+- `Controls` - Main playback control widget
+- `ProgressBarWidget` - Seekable progress bar
+- `EqualizerIcon` - Dynamic equalizer icon indicator
+- `EqualizerDialog` - Equalizer settings dialog
+- `TrackSelectionDialog` - Chapter/track selection dialog
+- `ChromeCastButton` - Chromecast connectivity button
+
+## Audio Service Integration
+
+The player integrates deeply with `MyAudioHandler` (custom `AudioHandler` implementation):
+
+- `audioHandler.initSongs()` - Initialize playlist
+- `audioHandler.play()` - Start playback
+- `audioHandler.pause()` - Pause playback
+- `audioHandler.setSkipSilence()` - Toggle silence skipping
+- `audioHandler.getPositionStream()` - Real-time position updates
+- `audioHandler.mediaItem` - Current track metadata stream
+- `audioHandler.chromeCastService` - Chromecast integration
+
+## Background Execution
+
+Uses `flutter_background` package to maintain timer functionality when app is backgrounded:
+
+- Displays persistent notification while timer is active
+- Pauses playback when timer expires (even in background)
+- Properly cleans up background execution when timer completes or is canceled

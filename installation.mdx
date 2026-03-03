@@ -1,0 +1,252 @@
+---
+title: "Installation"
+description: "Download and install Aradia Audiobooks on your Android device"
+---
+
+## System Requirements
+
+Before installing Aradia, ensure your device meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="Android Version" icon="android">
+    Android 5.0 (Lollipop) or higher
+  </Card>
+  <Card title="Storage Space" icon="hard-drive">
+    Minimum 50 MB for the app (additional space needed for downloaded audiobooks)
+  </Card>
+  <Card title="Internet Connection" icon="wifi">
+    Required for browsing and streaming (optional for downloaded content)
+  </Card>
+  <Card title="Permissions" icon="shield-check">
+    Storage access for downloads, notification access for playback controls
+  </Card>
+</CardGroup>
+
+<Note>
+  Aradia currently supports **Android only**. iOS support is not available at this time.
+</Note>
+
+## Download the APK
+
+<Steps>
+  <Step title="Visit the Releases Page">
+    Go to the [Aradia GitHub Releases page](https://github.com/sagarchaulagai/aradia/releases) to download the latest version.
+    
+    <Tip>
+      Always download from the official GitHub repository to ensure you're getting the authentic, safe version of Aradia.
+    </Tip>
+  </Step>
+  
+  <Step title="Download the Latest APK">
+    1. Find the latest release at the top of the page (version **3.0.0** or newer)
+    2. Scroll down to the **Assets** section
+    3. Click on the file named `aradia-v3.0.0.apk` (or similar) to download
+    
+    The APK file is typically around 40-50 MB in size.
+  </Step>
+  
+  <Step title="Enable Unknown Sources">
+    Before installing, you need to allow installation from unknown sources:
+    
+    **For Android 8.0 and above:**
+    1. Open **Settings** on your device
+    2. Go to **Apps & notifications** > **Advanced** > **Special app access**
+    3. Tap **Install unknown apps**
+    4. Select your browser or file manager
+    5. Enable **Allow from this source**
+    
+    **For Android 7.1 and below:**
+    1. Open **Settings** on your device
+    2. Go to **Security** or **Lock screen and security**
+    3. Enable **Unknown sources**
+    4. Tap **OK** to confirm
+    
+    <Warning>
+      Only enable "Unknown sources" for trusted apps like Aradia. Remember to disable it after installation for security purposes.
+    </Warning>
+  </Step>
+  
+  <Step title="Install the APK">
+    1. Open your device's **Downloads** folder or notification panel
+    2. Tap on the downloaded `aradia-v3.0.0.apk` file
+    3. Tap **Install** when prompted
+    4. Wait for the installation to complete (usually takes 10-30 seconds)
+    5. Tap **Open** to launch Aradia, or **Done** to finish
+    
+    <Check>
+      Installation successful! You should now see the Aradia icon in your app drawer.
+    </Check>
+  </Step>
+</Steps>
+
+## First Launch Setup
+
+When you first open Aradia, you'll need to grant some permissions:
+
+<AccordionGroup>
+  <Accordion title="Storage Permission" icon="folder-open">
+    **Required** for downloading audiobooks to your device.
+    
+    - Tap **Allow** when prompted to grant storage access
+    - This permission is necessary to save audiobook files for offline listening
+  </Accordion>
+  
+  <Accordion title="Notification Permission" icon="bell">
+    **Recommended** for playback controls and download notifications.
+    
+    - Tap **Allow** to enable notifications
+    - This lets you control playback from the notification shade and lock screen
+  </Accordion>
+  
+  <Accordion title="Background Activity" icon="circle-play">
+    **Recommended** for uninterrupted background playback.
+    
+    - Allow Aradia to run in the background
+    - This ensures audio continues playing when you switch apps or lock your device
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  After granting permissions, you're ready to start exploring! The app will load the home screen with featured audiobooks and genre categories.
+</Tip>
+
+## Updating Aradia
+
+Aradia includes an auto-update checker that notifies you when a new version is available.
+
+<Steps>
+  <Step title="Check for Updates">
+    When a new version is released, you'll see an update prompt on the home screen.
+  </Step>
+  
+  <Step title="Download the Latest Version">
+    1. Tap **Update** in the prompt
+    2. You'll be redirected to the GitHub releases page
+    3. Download the latest APK file
+  </Step>
+  
+  <Step title="Install Over Existing Version">
+    1. Tap the downloaded APK to install
+    2. Tap **Update** when prompted
+    3. Your settings and favorites will be preserved
+    
+    <Note>
+      You don't need to uninstall the old version first. The new version will install over it automatically.
+    </Note>
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Installation Blocked" icon="ban">
+    **Problem:** Android is blocking the installation.
+    
+    **Solution:**
+    - Make sure you've enabled "Unknown sources" or "Install unknown apps" for your browser/file manager
+    - Try downloading with a different browser (Chrome, Firefox, Samsung Internet)
+    - Ensure you have enough storage space (at least 100 MB free)
+  </Accordion>
+  
+  <Accordion title="App Won't Open" icon="triangle-exclamation">
+    **Problem:** Aradia crashes on launch or won't open.
+    
+    **Solution:**
+    - Restart your device
+    - Clear the app cache: **Settings** > **Apps** > **Aradia** > **Storage** > **Clear cache**
+    - Reinstall the app
+    - Ensure your Android version is 5.0 or higher
+  </Accordion>
+  
+  <Accordion title="Download Fails" icon="circle-xmark">
+    **Problem:** APK download fails or file is corrupted.
+    
+    **Solution:**
+    - Try downloading again with a stable internet connection
+    - Use a different browser
+    - Download directly from GitHub instead of third-party sites
+    - Check that you have enough storage space
+  </Accordion>
+  
+  <Accordion title="Storage Permission Issues" icon="lock">
+    **Problem:** Can't download audiobooks or import local files.
+    
+    **Solution:**
+    - Go to **Settings** > **Apps** > **Aradia** > **Permissions**
+    - Enable **Storage** or **Files and media** permission
+    - Restart the app
+  </Accordion>
+</AccordionGroup>
+
+## Uninstalling Aradia
+
+If you need to uninstall Aradia:
+
+1. Go to **Settings** > **Apps** > **Aradia**
+2. Tap **Uninstall**
+3. Confirm the action
+
+<Warning>
+  Uninstalling will remove all downloaded audiobooks, favorites, and listening history. Make sure to back up any important data before uninstalling.
+</Warning>
+
+## Alternative Installation Methods
+
+<Tabs>
+  <Tab title="ADB Install">
+    For developers or advanced users, you can install via ADB:
+    
+    ```bash
+    # Enable USB debugging on your device
+    # Connect your device to your computer
+    
+    # Install the APK
+    adb install aradia-v3.0.0.apk
+    
+    # Or if updating an existing installation
+    adb install -r aradia-v3.0.0.apk
+    ```
+  </Tab>
+  
+  <Tab title="File Manager">
+    If the download method doesn't work:
+    
+    1. Download the APK to your computer
+    2. Transfer it to your Android device via USB cable
+    3. Use a file manager app to navigate to the APK
+    4. Tap the APK file to install
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Learn how to browse, play, and download your first audiobook
+  </Card>
+  <Card
+    title="Features Overview"
+    icon="sparkles"
+    href="/features/audiobook-library"
+  >
+    Explore all the features Aradia has to offer
+  </Card>
+  <Card
+    title="User Guide"
+    icon="book-open"
+    href="/guide/browsing-audiobooks"
+  >
+    Detailed guides for getting the most out of Aradia
+  </Card>
+  <Card
+    title="Get Support"
+    icon="discord"
+    href="https://discord.gg/QwTxRKC9UF"
+  >
+    Join our Discord community for help and discussions
+  </Card>
+</CardGroup>

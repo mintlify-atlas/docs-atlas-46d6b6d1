@@ -1,0 +1,504 @@
+---
+title: 'Local File Import'
+description: 'Import audiobooks from your device storage with automatic organization and metadata extraction'
+icon: 'folder-open'
+---
+
+## Overview
+
+Aradia supports importing audiobooks from local storage using Android's Storage Access Framework (SAF). The system intelligently organizes your files based on folder structure and automatically extracts metadata and cover art.
+
+## Import Features
+
+<CardGroup cols={2}>
+  <Card title="SAF Integration" icon="android">
+    Secure access to any folder on your device
+  </Card>
+  <Card title="3-Level Organization" icon="folder-tree">
+    Supports single files, folders, and author/book structure
+  </Card>
+  <Card title="Metadata Extraction" icon="file-audio">
+    Automatic extraction from ID3 tags and file metadata
+  </Card>
+  <Card title="Smart Caching" icon="bolt">
+    Incremental scanning with change detection
+  </Card>
+</CardGroup>
+
+## Folder Structure Levels
+
+Aradia supports three organizational levels:
+
+### Level 0: Standalone Files
+
+Audio files directly in the root folder:
+
+```
+/Audiobooks/
+├── artofwar.mp3
+├── thinkandgrowrich.mp3
+└── meditation.mp3
+```
+
+Each file becomes a separate audiobook with metadata from ID3 tags.
+
+### Level 1: Single Folder Audiobooks
+
+Audiobooks organized in individual folders:
+
+```
+/Audiobooks/
+├── Art of War/
+│   ├── chapter1.mp3
+│   ├── chapter2.mp3
+│   └── cover.jpg
+└── Think and Grow Rich/
+    ├── part1.mp3
+    └── part2.mp3
+```
+
+Folder name becomes the audiobook title.
+
+### Level 2: Author/Book Structure
+
+Organized by author and book:
+
+```
+/Audiobooks/
+├── Sun Tzu/
+│   └── Art of War/
+│       ├── chapter1.mp3
+│       └── cover.jpg
+└── Napoleon Hill/
+    └── Think and Grow Rich/
+        ├── part1.mp3
+        └── part2.mp3
+```
+
+First folder = Author, Second folder = Book title.
+
+## Scanning Process
+
+<Steps>
+  <Step title="Select Root Folder">
+    User grants access to a folder via SAF:
+    
+    ```dart Root Folder Selection (local_audiobook_service.dart:16-24)
+    static Future<String?> getRootFolderPath() async {
+      final box = await Hive.openBox('settings');
+      return box.get(_rootFolderKey);
+    }
+
+    static Future<void> setRootFolderPath(String p) async {
+      final box = await Hive.openBox('settings');
+      await box.put(_rootFolderKey, p);
+    }
+    ```
+  </Step>
+  
+  <Step title="Scan for Files">
+    Retrieve all files in the root folder:
+    
+    ```dart File Scanning (local_audiobook_service.dart:587-600)
+    static Future<List<LocalAudiobook>> scanForAudiobooks() async {
+      final rootFolderPath = await getRootFolderPath();
+      if (rootFolderPath == null) {
+        AppLogger.error('Root folder path is null');
+        return [];
+      }
+
+      List<String>? allFilesInsideRootFolder =
+          await Saf.getFilesPathFor(rootFolderPath);
+
+      if (allFilesInsideRootFolder == null) {
+        AppLogger.error('Failed to get files from root folder');
+        return [];
+      }
+      // ...
+    }
+    ```
+  </Step>
+  
+  <Step title="Process by Level">
+    Files are processed based on their directory depth:
+    
+    ```dart Level Processing (local_audiobook_service.dart:607-632)
+    // Level 0: Standalone audiobooks (files directly in root)
+    List<LocalAudiobook> level0Audiobooks =
+        await processLevel0Audiobooks(rootFolderPath, allFilesInsideRootFolder);
+    allAudiobooks.addAll(level0Audiobooks);
+
+    await Saf.clearCacheFor(rootFolderPath);
+
+    // Level 1: Single subfolder audiobooks
+    List<LocalAudiobook> level1Audiobooks =
+        await processLevel1Audiobooks(rootFolderPath, allFilesInsideRootFolder);
+    allAudiobooks.addAll(level1Audiobooks);
+
+    await Saf.clearCacheFor(rootFolderPath);
+
+    // Level 2: Two subfolder audiobooks
+    List<LocalAudiobook> level2Audiobooks =
+        await processLevel2Audiobooks(rootFolderPath, allFilesInsideRootFolder);
+    allAudiobooks.addAll(level2Audiobooks);
+    ```
+  </Step>
+</Steps>
+
+## Metadata Extraction
+
+### Level 0 Processing
+
+<CodeGroup>
+```dart Level 0 Metadata (local_audiobook_service.dart:686-755)
+for (String filePath in level0FilesPaths) {
+  try {
+    // Extract metadata from the audio file
+    Metadata metadata;
+    try {
+      metadata = await MediaHelper.getAudioMetadata(filePath, rootFolderPath)
+          .timeout(const Duration(seconds: 60));
+    } catch (timeoutError) {
+      // Create basic metadata as fallback
+      metadata = Metadata(
+        trackName: path.basenameWithoutExtension(filePath),
+        albumName: path.basenameWithoutExtension(filePath),
+        albumArtistName: 'Unknown',
+        trackDuration: null,
+        albumArt: null,
+        filePath: filePath,
+      );
+    }
+
+    // Get title and author from metadata
+    String title = metadata.albumName ??
+        metadata.trackName ??
+        path.basenameWithoutExtension(filePath);
+    String author = metadata.albumArtistName ??
+        metadata.trackArtistNames?.join(', ') ??
+        'Unknown';
+
+    // Look for cover image with same name as audio file
+    String? coverImagePath = await MediaHelper.findCoverImageForAudioFile(
+        filePath, rootFolderPath);
+
+    // If no cover image found, try to extract from metadata
+    if (coverImagePath == null && metadata.albumArt != null) {
+      coverImagePath = await MediaHelper.saveAlbumArtFromMetadata(
+          metadata.albumArt!, path.basenameWithoutExtension(filePath));
+    }
+
+    // Create the audiobook object
+    final audiobook = LocalAudiobook(
+      id: filePath,
+      title: title,
+      author: author,
+      folderPath: rootFolderPath,
+      coverImagePath: coverImagePath,
+      audioFiles: [filePath],
+      totalDuration: metadata.trackDuration != null
+          ? Duration(milliseconds: metadata.trackDuration!)
+          : null,
+      dateAdded: DateTime.now(),
+      lastModified: DateTime.now(),
+      description: metadata.authorName ?? metadata.writerName,
+      genre: metadata.genre,
+    );
+
+    audiobooks.add(audiobook);
+  } catch (e) {
+    AppLogger.error('Error processing audiobook $filePath: $e');
+    continue;
+  }
+}
+```
+</CodeGroup>
+
+### Level 1 Processing
+
+<CodeGroup>
+```dart Level 1 Organization (local_audiobook_service.dart:814-863)
+for (String subfolder in folderGroups.keys) {
+  List<String> filesInFolder = folderGroups[subfolder]!;
+
+  // Filter audio files
+  List<String> audioFiles = [];
+  for (String filePath in filesInFolder) {
+    if (await MediaHelper.isAudioFile(filePath)) {
+      audioFiles.add(filePath);
+    }
+  }
+
+  if (audioFiles.isEmpty) continue;
+
+  // Title is the subfolder name (capitalized)
+  String title = MediaHelper.capitalizeWords(subfolder);
+  String author = 'Unknown';
+
+  // Find cover image in the subfolder
+  String? coverImagePath = await MediaHelper.findCoverImageInFolder(
+      filesInFolder, subfolder, rootFolderPath);
+
+  // If no cover found, try to extract from first audio file metadata
+  if (coverImagePath == null && audioFiles.isNotEmpty) {
+    coverImagePath = await MediaHelper.extractCoverFromAudioMetadata(
+        audioFiles.first, rootFolderPath, subfolder);
+  }
+
+  // Calculate total duration from all audio files
+  Duration? totalDuration = await MediaHelper.calculateTotalDuration(
+      audioFiles, rootFolderPath);
+
+  final audiobook = LocalAudiobook(
+    id: path.join(rootFolderPath, subfolder),
+    title: title,
+    author: author,
+    folderPath: path.join(rootFolderPath, subfolder),
+    coverImagePath: coverImagePath,
+    audioFiles: audioFiles,
+    totalDuration: totalDuration,
+    dateAdded: DateTime.now(),
+    lastModified: DateTime.now(),
+  );
+
+  audiobooks.add(audiobook);
+}
+```
+</CodeGroup>
+
+### Level 2 Processing
+
+<CodeGroup>
+```dart Level 2 Author/Book (local_audiobook_service.dart:936-985)
+for (String author in authorBookGroups.keys) {
+  for (String book in authorBookGroups[author]!.keys) {
+    List<String> filesInBook = authorBookGroups[author]![book]!;
+
+    // Filter audio files
+    List<String> audioFiles = [];
+    for (String filePath in filesInBook) {
+      if (await MediaHelper.isAudioFile(filePath)) {
+        audioFiles.add(filePath);
+      }
+    }
+
+    if (audioFiles.isEmpty) continue;
+
+    // Title is the book name, Author is the author name
+    String title = MediaHelper.capitalizeWords(book);
+    String authorName = MediaHelper.capitalizeWords(author);
+
+    // Find cover image in the book folder
+    String? coverImagePath = await MediaHelper.findCoverImageInFolder(
+        filesInBook, book, rootFolderPath);
+
+    // If no cover found, try to extract from first audio file
+    if (coverImagePath == null && audioFiles.isNotEmpty) {
+      coverImagePath = await MediaHelper.extractCoverFromAudioMetadata(
+          audioFiles.first, rootFolderPath, book);
+    }
+
+    // Calculate total duration from all audio files
+    Duration? totalDuration = await MediaHelper.calculateTotalDuration(
+        audioFiles, rootFolderPath);
+
+    final audiobook = LocalAudiobook(
+      id: path.join(rootFolderPath, author, book),
+      title: title,
+      author: authorName,
+      folderPath: path.join(rootFolderPath, author, book),
+      coverImagePath: coverImagePath,
+      audioFiles: audioFiles,
+      totalDuration: totalDuration,
+      dateAdded: DateTime.now(),
+      lastModified: DateTime.now(),
+    );
+
+    audiobooks.add(audiobook);
+  }
+}
+```
+</CodeGroup>
+
+## Cover Image Detection
+
+Covers are found through multiple methods:
+
+<Steps>
+  <Step title="Exact File Match">
+    Look for image files with the same base name as the audio file
+  </Step>
+  
+  <Step title="Folder Search">
+    Search for common cover image names:
+    - cover
+    - folder
+    - audiobook
+    - front
+    - album
+    - art
+    - artwork
+    - book
+  </Step>
+  
+  <Step title="Embedded Art">
+    Extract album art from audio file metadata
+  </Step>
+</Steps>
+
+## Smart Refresh
+
+The smart refresh system only processes changed files:
+
+<CodeGroup>
+```dart Smart Refresh (local_audiobook_service.dart:140-286)
+static Future<List<LocalAudiobook>> smartRefreshAudiobooks() async {
+  // Get current file list from SAF
+  List<String>? currentFiles = await Saf.getFilesPathFor(rootFolderPath);
+  
+  // Get cached file list
+  List<String>? cachedFiles = await getLastScannedFiles();
+
+  // If no cache exists, do a full scan
+  if (cachedFiles == null) {
+    final scanned = await scanForAudiobooks();
+    await saveScannedFiles(currentFiles);
+    return scanned;
+  }
+
+  // Compare file lists to detect changes
+  Set<String> currentFileSet = currentFiles.toSet();
+  Set<String> cachedFileSet = cachedFiles.toSet();
+
+  Set<String> newFiles = currentFileSet.difference(cachedFileSet);
+  Set<String> deletedFiles = cachedFileSet.difference(currentFileSet);
+  Set<String> changedFiles = newFiles.union(deletedFiles);
+
+  // If no changes, return cached audiobooks
+  if (changedFiles.isEmpty) {
+    await saveScannedFiles(currentFiles); // Update scan time
+    return await getAllAudiobooks();
+  }
+
+  // Get affected audiobook IDs
+  Set<String> affectedIds =
+      _getAffectedAudiobookIds(changedFiles.toList(), rootFolderPath);
+
+  // Process only affected audiobooks
+  for (String audiobookId in affectedIds) {
+    // Get files for this specific audiobook
+    List<String> audiobookFiles = currentFiles.where((file) {
+      String? fileAudiobookId =
+          _getAudiobookIdForFile(file, rootFolderPath);
+      return fileAudiobookId == audiobookId;
+    }).toList();
+
+    // Process the audiobook
+    LocalAudiobook? processedAudiobook = await _processSingleAudiobook(
+        audiobookId, audiobookFiles, level, rootFolderPath);
+
+    if (processedAudiobook != null) {
+      audiobookMap[audiobookId] = processedAudiobook;
+      await updateAudiobook(processedAudiobook);
+    }
+  }
+
+  return audiobookMap.values.toList();
+}
+```
+</CodeGroup>
+
+<Tip>
+**Performance Boost**: Smart refresh only processes changed files, making subsequent scans much faster!
+</Tip>
+
+## File Caching
+
+Scanned file paths are cached to enable change detection:
+
+<CodeGroup>
+```dart File Cache (local_audiobook_service.dart:68-106)
+/// Get the last scanned file paths from cache
+static Future<List<String>?> getLastScannedFiles() async {
+  try {
+    final box = await Hive.openBox(_fileCacheBoxName);
+    final cacheData = box.get('file_cache');
+    if (cacheData != null) {
+      final map = Map<String, dynamic>.from(cacheData);
+      return List<String>.from(map['file_paths'] ?? []);
+    }
+    return null;
+  } catch (e) {
+    AppLogger.error('Error getting last scanned files from cache: $e');
+    return null;
+  }
+}
+
+/// Save the scanned file paths to cache
+static Future<void> saveScannedFiles(List<String> files) async {
+  try {
+    final box = await Hive.openBox(_fileCacheBoxName);
+    final cacheData = {
+      'file_paths': files,
+      'last_scan_time': DateTime.now().millisecondsSinceEpoch,
+    };
+    await box.put('file_cache', cacheData);
+  } catch (e) {
+    AppLogger.error('Error saving scanned files to cache: $e');
+  }
+}
+```
+</CodeGroup>
+
+## Storage Operations
+
+<Tabs>
+  <Tab title="Save Audiobook">
+    ```dart
+    static Future<void> saveAudiobook(LocalAudiobook audiobook) async {
+      final box = await Hive.openBox(_audiobooksBoxName);
+      await box.put(audiobook.id, audiobook.toMap());
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Update Audiobook">
+    ```dart
+    static Future<void> updateAudiobook(LocalAudiobook audiobook) async {
+      final box = await Hive.openBox(_audiobooksBoxName);
+      await box.put(audiobook.id, audiobook.toMap());
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Delete Audiobook">
+    ```dart
+    static Future<void> deleteAudiobook(LocalAudiobook audiobook) async {
+      final box = await Hive.openBox(_audiobooksBoxName);
+      await box.delete(audiobook.id);
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Get All">
+    ```dart
+    static Future<List<LocalAudiobook>> getAllAudiobooks() async {
+      final box = await Hive.openBox(_audiobooksBoxName);
+      final List<LocalAudiobook> audiobooks = [];
+      for (final key in box.keys) {
+        final map = Map<String, dynamic>.from(box.get(key));
+        audiobooks.add(LocalAudiobook.fromMap(map));
+      }
+      return audiobooks;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Check>
+Local audiobooks are stored in Hive for instant access without re-scanning!
+</Check>
+
+<Card title="Next Steps" icon="arrow-right" href="/features/search-browse">
+  Learn how to search and browse your audiobook collection
+</Card>

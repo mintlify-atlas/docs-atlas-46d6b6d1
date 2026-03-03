@@ -1,0 +1,198 @@
+---
+title: 'YouTubeAudioSource'
+description: 'Custom audio source for streaming YouTube audio in just_audio'
+---
+
+The `YouTubeAudioSource` class extends `StreamAudioSource` from `just_audio` to provide seamless YouTube audio streaming with adaptive quality selection.
+
+## Overview
+
+`YouTubeAudioSource` enables direct streaming of YouTube audio without downloading entire videos. It:
+- Fetches audio-only streams from YouTube using `youtube_explode_dart`
+- Supports quality selection (high/low bitrate)
+- Handles throttled streams with chunk-based requests
+- Integrates with `just_audio` player for background playback
+
+**Source:** `lib/resources/services/youtube/youtube_audio_service.dart`
+
+**Credit:** Based on implementation from [jhelumcorp/gyawun](https://github.com/jhelumcorp/gyawun/blob/main/lib/services/yt_audio_stream.dart)
+
+## Constructor
+
+Creates a YouTube audio source for a specific video.
+
+<ParamField path="videoId" type="String" required>
+  YouTube video ID (e.g., 'dQw4w9WgXcQ')
+</ParamField>
+
+<ParamField path="quality" type="String" required>
+  Audio quality: 'high' or 'low'
+</ParamField>
+
+<ParamField path="tag" type="dynamic">
+  Optional metadata tag (typically a MediaItem)
+</ParamField>
+
+**Example:**
+```dart
+final audioSource = YouTubeAudioSource(
+  videoId: 'dQw4w9WgXcQ',
+  quality: 'high',
+  tag: mediaItem,
+);
+```
+
+## Public Methods
+
+### request
+
+Fetches an audio stream segment for the specified byte range.
+
+<ParamField path="start" type="int">
+  Starting byte position (default: 0)
+</ParamField>
+
+<ParamField path="end" type="int">
+  Ending byte position (default: end of stream)
+</ParamField>
+
+**Returns:** `Future<StreamAudioResponse>`
+
+The response includes:
+- `sourceLength` - Total audio file size in bytes
+- `contentLength` - Size of requested segment
+- `offset` - Starting position of segment
+- `stream` - Audio data stream
+- `contentType` - MIME type of audio codec
+
+**Example:**
+```dart
+final response = await audioSource.request(0, 1024 * 1024); // First 1MB
+print('Content type: ${response.contentType}');
+print('Total length: ${response.sourceLength} bytes');
+```
+
+## Quality Selection
+
+### High Quality
+Selects the audio stream with the **highest bitrate** from available audio-only streams.
+
+```dart
+final source = YouTubeAudioSource(
+  videoId: 'abc123',
+  quality: 'high',
+);
+```
+
+### Low Quality
+Selects the audio stream with the **lowest bitrate** to minimize bandwidth usage.
+
+```dart
+final source = YouTubeAudioSource(
+  videoId: 'abc123',
+  quality: 'low',
+);
+```
+
+## Throttling Handling
+
+For throttled YouTube streams, the audio source:
+1. Limits chunk size to ~10MB per request
+2. Prevents buffer overflow in ExoPlayer backend
+3. Automatically manages byte range requests
+
+```dart
+// Throttled stream detection
+if (audioStream.isThrottled) {
+  final cap = 10 * 1024 * 1024; // 10MB chunks
+  e = (end ?? (s + cap));
+}
+```
+
+## Integration with MyAudioHandler
+
+The `YouTubeAudioSource` is used in `MyAudioHandler.initSongs()` to handle YouTube URLs in audiobook files:
+
+```dart
+if (isYouTube && song.url != null) {
+  final videoId = VideoId.parseVideoId(song.url!) ?? song.url!;
+  sources.add(
+    YouTubeAudioSource(
+      videoId: videoId,
+      tag: item,
+      quality: 'high',
+    ),
+  );
+}
+```
+
+## YouTube Client Configuration
+
+The service uses the `AndroidVR` YouTube client for improved compatibility:
+
+```dart
+final manifest = await ytExplode.videos.streams.getManifest(
+  videoId,
+  requireWatchPage: true,
+  ytClients: [YoutubeApiClient.androidVr],
+);
+```
+
+## Audio Format Selection
+
+The source selects audio streams with these priorities:
+1. **Audio-only streams** (no video data)
+2. **Sorted by bitrate** (ascending or descending based on quality)
+3. **First available stream** if no audio-only streams exist
+
+```dart
+final supportedStreams = manifest.audioOnly.sortByBitrate();
+final audioStream = quality == 'high' 
+    ? supportedStreams.firstOrNull 
+    : supportedStreams.lastOrNull;
+```
+
+## Error Handling
+
+The `request` method throws exceptions for:
+- No available audio streams for the video
+- Network failures during stream fetch
+- Invalid video IDs
+
+**Example error:**
+```dart
+try {
+  final response = await audioSource.request();
+} catch (e) {
+  print('Failed to load audio: $e');
+  // Handle error (e.g., show error message to user)
+}
+```
+
+## Usage in AudioSource List
+
+Combine with other audio sources in a playlist:
+
+```dart
+final sources = <AudioSource>[
+  YouTubeAudioSource(videoId: 'video1', quality: 'high'),
+  AudioSource.uri(Uri.parse('https://example.com/audio.mp3')),
+  YouTubeAudioSource(videoId: 'video2', quality: 'low'),
+];
+
+await player.setAudioSources(sources);
+```
+
+## Performance Considerations
+
+- **Streaming overhead:** YouTube streams require network connection throughout playback
+- **Chunk size:** Throttled streams use 10MB chunks to balance buffering and memory
+- **Quality impact:** High quality streams use more bandwidth but provide better audio fidelity
+- **Caching:** The underlying `just_audio` player may cache segments in memory
+
+## Limitations
+
+- Requires active internet connection
+- No offline playback support
+- YouTube stream URLs expire after some time
+- Subject to YouTube's rate limiting and availability

@@ -1,0 +1,369 @@
+---
+title: 'AudiobookDetails Screen'
+description: 'Detailed view of an audiobook with playback controls and chapter list'
+---
+
+## Overview
+
+The `AudiobookDetails` screen displays comprehensive information about a specific audiobook, including cover art, description, author information, ratings, audio file chapters, and subjects. It provides controls for playing chapters and managing favorites.
+
+**File Location**: `lib/screens/audiobook_details/audiobook_details.dart`
+
+## Purpose and Functionality
+
+The AudiobookDetails screen serves as the primary interface for:
+
+- Displaying audiobook metadata (title, author, description, origin)
+- Showing high-quality cover images
+- Listing all audio file chapters with durations
+- Playing individual chapters or resuming from history
+- Adding/removing audiobooks from favorites
+- Downloading audiobooks for offline playback
+- Navigating to genre-specific audiobook lists via subject tags
+- Showing audiobook statistics (downloads, ratings for LibriVox content)
+
+## Screen Parameters
+
+```dart
+final Audiobook audiobook;      // Required audiobook object
+final bool isDownload;          // Is this a downloaded audiobook? (default: false)
+final bool isYoutube;           // Is this from YouTube import? (default: false)
+final bool isLocal;             // Is this from local storage? (default: false)
+```
+
+## Key Components
+
+### State Management
+
+Uses `AudiobookDetailsBloc` for managing audiobook details and favorite status:
+
+```dart
+late AudiobookDetailsBloc _audiobookDetailsBloc;
+```
+
+### Data Storage
+
+Utilizes Hive boxes for persistence:
+
+```dart
+late Box<dynamic> playingAudiobookDetailsBox;  // Stores currently playing audiobook state
+```
+
+### Services
+
+- **AudioHandlerProvider**: Manages audio playback via `audio_service`
+- **HistoryOfAudiobook**: Tracks playback history and resume positions
+- **WeSlideController**: Controls the sliding player panel
+
+## Widget Structure
+
+The screen layout (within a `SingleChildScrollView`):
+
+1. **App Bar**
+   - Audiobook title
+   - Favorite icon button (heart)
+
+2. **Cover Image** (200x200, rounded corners)
+   - Low/high quality image with LowAndHighImage widget
+
+3. **Metadata Section**
+   - Title
+   - Author
+   - Download count (LibriVox only)
+   - Origin (librivox/youtube/local)
+   - Rating widget (LibriVox only)
+
+4. **Action Card** (orange accent color)
+   - Download button
+   - Play button
+
+5. **Description Section**
+   - Expandable description text
+
+6. **Audio Files List**
+   - ListView of chapters with titles and durations
+   - Each chapter has a play button
+
+7. **Subjects Section**
+   - Chip widgets for each subject/genre
+   - Tappable to navigate to genre page (LibriVox only)
+
+## BLoC Events
+
+### FetchAudiobookDetails
+```dart
+FetchAudiobookDetails(audiobookId, isDownload, isYoutube, isLocal)
+```
+Fetches the audiobook's audio files based on the source type (API, downloaded, YouTube, or local).
+
+### GetFavouriteStatus
+```dart
+GetFavouriteStatus(audiobook)
+```
+Checks if the audiobook is in the user's favorites and updates the favorite icon state.
+
+### FavouriteIconButtonClicked
+```dart
+FavouriteIconButtonClicked(audiobook)
+```
+Toggles the audiobook's favorite status (add or remove from favorites).
+
+## BLoC States
+
+### Initial and Loading States
+- `AudiobookDetailsInitial` - Initial state before fetching
+- `AudiobookDetailsLoading` - Fetching audiobook details
+
+### Success States
+- `AudiobookDetailsLoaded(audiobookFiles)` - Contains list of `AudiobookFile` objects
+- `AudiobookDetailsFavourite(isFavourite)` - Boolean indicating favorite status
+
+### Failure States
+- `AudiobookDetailsError` - Failed to fetch audiobook details
+
+## Navigation
+
+### Genre Audiobooks Screen
+```dart
+context.push('/genre_audiobooks', extra: subjectName)
+```
+Navigates to a list of audiobooks for the selected subject/genre (LibriVox audiobooks only).
+
+### Audiobook Details Screen
+```dart
+context.push('/audiobook-details', extra: {
+  'audiobook': audiobook,
+  'isDownload': false,
+  'isYoutube': false,
+  'isLocal': false,
+})
+```
+Route for accessing this screen from other parts of the app.
+
+## Code Examples
+
+### Playing a Chapter
+
+```dart
+Future<void> _playChapter(List<AudiobookFile> files, int index) async {
+  try {
+    await playingAudiobookDetailsBox.put('audiobook', widget.audiobook.toMap());
+    await playingAudiobookDetailsBox.put(
+      'audiobookFiles',
+      files.map((e) => e.toMap()).toList(),
+    );
+    await playingAudiobookDetailsBox.put('index', index);
+    await playingAudiobookDetailsBox.put('position', 0);
+
+    await audioHandlerProvider.audioHandler
+        .initSongs(files, widget.audiobook, index, 0);
+    await audioHandlerProvider.audioHandler.play();
+    _weSlideController.show();
+  } catch (e) {
+    AppLogger.debug('Error starting chapter playback: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Unable to start playback. Please try again.')),
+    );
+  }
+}
+```
+
+### Resume Playback from History
+
+```dart
+onPressed: () {
+  playingAudiobookDetailsBox.put('audiobook', widget.audiobook.toMap());
+  playingAudiobookDetailsBox.put('audiobookFiles',
+      state.audiobookFiles.map((e) => e.toMap()).toList());
+
+  if (historyOfAudiobook.isAudiobookInHistory(widget.audiobook.id)) {
+    audioHandlerProvider.audioHandler.initSongs(
+      state.audiobookFiles,
+      widget.audiobook,
+      historyOfAudiobook.getHistoryOfAudiobookItem(widget.audiobook.id).index,
+      historyOfAudiobook.getHistoryOfAudiobookItem(widget.audiobook.id).position,
+    );
+    playingAudiobookDetailsBox.put('index',
+        historyOfAudiobook.getHistoryOfAudiobookItem(widget.audiobook.id).index);
+    playingAudiobookDetailsBox.put('position',
+        historyOfAudiobook.getHistoryOfAudiobookItem(widget.audiobook.id).position);
+  } else {
+    playingAudiobookDetailsBox.put('index', 0);
+    playingAudiobookDetailsBox.put('position', 0);
+    audioHandlerProvider.audioHandler.initSongs(
+      state.audiobookFiles,
+      widget.audiobook,
+      0,
+      0,
+    );
+  }
+
+  audioHandlerProvider.audioHandler.play();
+  _weSlideController.show();
+}
+```
+
+### Favorite Icon Button
+
+```dart
+BlocConsumer<AudiobookDetailsBloc, AudiobookDetailsState>(
+  listener: (context, state) {},
+  listenWhen: (previous, current) =>
+      current is AudiobookDetailsFavourite,
+  buildWhen: (previous, current) =>
+      current is AudiobookDetailsFavourite,
+  builder: (context, state) {
+    if (state is AudiobookDetailsFavourite) {
+      return IconButton(
+        icon: state.isFavourite
+            ? const Icon(Icons.favorite, color: Colors.red, size: 30)
+            : const Icon(Icons.favorite_border, color: Colors.red, size: 30),
+        onPressed: () {
+          _audiobookDetailsBloc.add(
+              FavouriteIconButtonClicked(widget.audiobook));
+        },
+      );
+    } else {
+      return const SizedBox();
+    }
+  },
+)
+```
+
+### Audio Files List
+
+```dart
+ListView.builder(
+  itemCount: state.audiobookFiles.length,
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  itemBuilder: (context, index) {
+    return ListTile(
+      onTap: () => _playChapter(state.audiobookFiles, index),
+      title: Text(
+        state.audiobookFiles[index].title ?? 'N/A',
+        style: GoogleFonts.ubuntu(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        state.audiobookFiles[index].length != null
+            ? "${(state.audiobookFiles[index].length! / 60).floor()} minutes"
+            : 'N/A',
+        style: GoogleFonts.ubuntu(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: IconButton(
+        onPressed: () => _playChapter(state.audiobookFiles, index),
+        icon: const Icon(Icons.play_arrow),
+      ),
+    );
+  },
+)
+```
+
+### Subject Tags with Navigation
+
+```dart
+Wrap(
+  spacing: 5,
+  children: List.generate(
+    widget.audiobook.subject!.length,
+    (index) {
+      return widget.audiobook.origin == 'youtube'
+          ? Chip(
+              label: Text(
+                widget.audiobook.subject![index],
+                style: GoogleFonts.ubuntu(fontSize: 13),
+              ),
+            )
+          : GestureDetector(
+              onTap: () {
+                final subjectName = widget.audiobook.subject![index];
+                context.push('/genre_audiobooks', extra: subjectName);
+                AppLogger.debug('Tapped subject: $subjectName');
+              },
+              child: Chip(
+                label: Text(
+                  widget.audiobook.subject![index],
+                  style: GoogleFonts.ubuntu(fontSize: 13),
+                ),
+              ),
+            );
+    },
+  ),
+)
+```
+
+### Download Count Formatting
+
+```dart
+if (widget.audiobook.origin == 'librivox')
+  Text(
+    "Downloads : ${widget.audiobook.downloads != null 
+      ? widget.audiobook.downloads! > 999 
+        ? widget.audiobook.downloads! > 999999 
+          ? "${(widget.audiobook.downloads! / 1000000).toStringAsFixed(1)}M" 
+          : "${(widget.audiobook.downloads! / 1000).toStringAsFixed(1)}K" 
+        : widget.audiobook.downloads.toString() 
+      : "N/A"}",
+    style: GoogleFonts.ubuntu(
+      fontSize: 13,
+      fontWeight: FontWeight.w400,
+    ),
+  )
+```
+
+## Lifecycle Management
+
+### Initialization
+
+```dart
+@override
+void initState() {
+  _audiobookDetailsBloc = BlocProvider.of<AudiobookDetailsBloc>(context);
+  _audiobookDetailsBloc.add(GetFavouriteStatus(widget.audiobook));
+  _audiobookDetailsBloc.add(FetchAudiobookDetails(
+    widget.audiobook.id,
+    widget.isDownload,
+    widget.isYoutube,
+    widget.isLocal,
+  ));
+  playingAudiobookDetailsBox = Hive.box('playing_audiobook_details_box');
+  historyOfAudiobook = HistoryOfAudiobook();
+  super.initState();
+}
+```
+
+### Dependency Injection
+
+```dart
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  _weSlideController = Provider.of<WeSlideController>(context);
+  audioHandlerProvider = Provider.of<AudioHandlerProvider>(context);
+}
+```
+
+## Dependencies
+
+- `flutter_bloc` - State management
+- `provider` - Dependency injection
+- `go_router` - Navigation
+- `google_fonts` - Typography
+- `hive` - Local storage
+- `we_slide` - Sliding panel for player
+- `ionicons` - Icon pack for play button
+
+## Custom Widgets Used
+
+- `LowAndHighImage` - Progressive image loading widget
+- `RatingWidget` - Star rating display
+- `DescriptionText` - Expandable text widget for descriptions
+- `DownloadButton` - Custom download button with progress
+- `AppCircularProgressIndicator` - Branded loading indicator

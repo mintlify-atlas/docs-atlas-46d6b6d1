@@ -1,0 +1,458 @@
+---
+title: 'Building from Source'
+description: 'Step-by-step guide to building Aradia Audiobooks from source code'
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your development machine:
+
+<CardGroup cols={2}>
+  <Card title="Flutter SDK" icon="mobile">
+    Version 3.5.4 or higher
+  </Card>
+  <Card title="Dart SDK" icon="code">
+    Included with Flutter
+  </Card>
+  <Card title="Android Studio" icon="android">
+    For Android development and emulators
+  </Card>
+  <Card title="Git" icon="git-alt">
+    For cloning the repository
+  </Card>
+</CardGroup>
+
+## Environment Setup
+
+### Install Flutter
+
+<Steps>
+  <Step title="Download Flutter SDK">
+    Download the Flutter SDK from the official website:
+    ```bash
+    # macOS/Linux
+    git clone https://github.com/flutter/flutter.git -b stable
+    
+    # Add to PATH
+    export PATH="$PATH:`pwd`/flutter/bin"
+    ```
+  </Step>
+
+  <Step title="Verify Installation">
+    Run Flutter doctor to check your installation:
+    ```bash
+    flutter doctor
+    ```
+    
+    This will check your environment and display a report of the status of your Flutter installation.
+  </Step>
+
+  <Step title="Accept Android Licenses">
+    If you're developing for Android:
+    ```bash
+    flutter doctor --android-licenses
+    ```
+  </Step>
+</Steps>
+
+### System Requirements
+
+<Tabs>
+  <Tab title="Android">
+    - **Min SDK**: 21 (Android 5.0 Lollipop)
+    - **Target SDK**: Latest
+    - **Android Studio**: Arctic Fox or newer
+    - **Build Tools**: Latest version
+  </Tab>
+  
+  <Tab title="iOS">
+    - **Xcode**: Latest stable version
+    - **iOS**: 11.0 or higher
+    - **CocoaPods**: For iOS dependencies
+    - **macOS**: Required for iOS development
+  </Tab>
+</Tabs>
+
+## Clone the Repository
+
+<Steps>
+  <Step title="Clone Repository">
+    Clone the Aradia Audiobooks repository:
+    ```bash
+    git clone https://github.com/sagarchaulagai/aradia.git
+    cd aradia
+    ```
+  </Step>
+
+  <Step title="Check Dependencies">
+    Review the `pubspec.yaml` to understand project dependencies:
+    ```yaml pubspec.yaml
+    name: aradia
+    version: 3.0.0
+    
+    environment:
+      sdk: ^3.5.4
+    
+    dependencies:
+      flutter:
+        sdk: flutter
+      
+      # State Management
+      bloc: ^9.0.0
+      flutter_bloc: ^9.1.1
+      provider: ^6.1.2
+      
+      # Navigation
+      go_router: ^16.2.1
+      
+      # Local Storage
+      hive: ^2.2.3
+      hive_flutter: ^1.1.0
+      path_provider: ^2.1.5
+      
+      # Audio
+      audio_service: ^0.18.18
+      just_audio:
+        git:
+          url: https://github.com/sagarchaulagai/just_audio.git
+          path: just_audio
+          ref: a6f8db8ded43bdff0e39766fbbdbab8f22cadc2c
+      just_audio_background: ^0.0.1-beta.17
+      rxdart: ^0.28.0
+      
+      # UI & Utilities
+      cached_network_image: ^3.4.1
+      google_fonts: ^6.2.1
+      transparent_image: ^2.0.1
+      audio_video_progress_bar: ^2.0.3
+      we_slide: ^2.4.0
+      
+      # Downloads
+      background_downloader: ^9.2.4
+      permission_handler: ^12.0.1
+      
+      # Network
+      http: ^1.2.2
+      connectivity_plus: ^7.0.0
+      
+      # YouTube Support
+      youtube_explode_dart:
+        git:
+          url: https://github.com/sheikhhaziq/youtube_explode_dart.git
+      flutter_inappwebview: ^6.1.5
+      
+      # ChromeCast
+      flutter_chrome_cast: ^1.2.5
+    ```
+  </Step>
+</Steps>
+
+## Install Dependencies
+
+<Steps>
+  <Step title="Get Flutter Packages">
+    Install all Flutter dependencies:
+    ```bash
+    flutter pub get
+    ```
+    
+    This will download all packages specified in `pubspec.yaml`.
+  </Step>
+
+  <Step title="Run Code Generation (if needed)">
+    Some dependencies like Hive require code generation:
+    ```bash
+    flutter pub run build_runner build --delete-conflicting-outputs
+    ```
+    
+    <Note>
+    This step is only needed if you modify Hive models or other generated code.
+    </Note>
+  </Step>
+
+  <Step title="Verify Dependencies">
+    Check that all dependencies are properly installed:
+    ```bash
+    flutter pub deps
+    ```
+  </Step>
+</Steps>
+
+## Build the Application
+
+### Development Build
+
+<Tabs>
+  <Tab title="Android">
+    <Steps>
+      <Step title="Connect Device or Start Emulator">
+        Connect an Android device via USB or start an Android emulator:
+        ```bash
+        # List available devices
+        flutter devices
+        
+        # Start an emulator
+        flutter emulators --launch <emulator_id>
+        ```
+      </Step>
+
+      <Step title="Run in Debug Mode">
+        Run the app in debug mode:
+        ```bash
+        flutter run
+        ```
+        
+        Or specify a device:
+        ```bash
+        flutter run -d <device_id>
+        ```
+      </Step>
+
+      <Step title="Hot Reload During Development">
+        While the app is running, you can:
+        - Press `r` to hot reload
+        - Press `R` to hot restart
+        - Press `q` to quit
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="iOS">
+    <Steps>
+      <Step title="Install CocoaPods Dependencies">
+        Navigate to the iOS directory and install pods:
+        ```bash
+        cd ios
+        pod install
+        cd ..
+        ```
+      </Step>
+
+      <Step title="Open in Xcode (Optional)">
+        If you need to configure signing or capabilities:
+        ```bash
+        open ios/Runner.xcworkspace
+        ```
+      </Step>
+
+      <Step title="Run on Simulator or Device">
+        ```bash
+        # Run on iOS simulator
+        flutter run
+        
+        # Run on connected iOS device
+        flutter run -d <device_id>
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+### Production Build
+
+<Tabs>
+  <Tab title="Android APK">
+    Build a release APK:
+    ```bash
+    flutter build apk --release
+    ```
+    
+    The APK will be available at:
+    ```
+    build/app/outputs/flutter-apk/app-release.apk
+    ```
+    
+    <Note>
+    For a smaller APK, build split APKs per ABI:
+    ```bash
+    flutter build apk --split-per-abi --release
+    ```
+    </Note>
+  </Tab>
+
+  <Tab title="Android App Bundle">
+    Build an Android App Bundle for Play Store:
+    ```bash
+    flutter build appbundle --release
+    ```
+    
+    The AAB will be available at:
+    ```
+    build/app/outputs/bundle/release/app-release.aab
+    ```
+  </Tab>
+
+  <Tab title="iOS">
+    Build for iOS release:
+    ```bash
+    flutter build ios --release
+    ```
+    
+    Then create an archive in Xcode:
+    1. Open `ios/Runner.xcworkspace` in Xcode
+    2. Select **Product > Archive**
+    3. Use **Organizer** to upload to App Store
+  </Tab>
+</Tabs>
+
+## Configuration
+
+### App Icon
+
+The app uses adaptive icons for Android. Icon assets are located in:
+
+```yaml pubspec.yaml
+flutter_launcher_icons:
+  android: true
+  ios: false
+  
+  adaptive_icon_foreground: assets/icon/fg.png
+  adaptive_icon_background: "#FF7A00"
+  adaptive_icon_monochrome: assets/icon/mono.png
+  image_path_android: assets/icon/legacy.png
+  
+  min_sdk_android: 21
+```
+
+To generate new icons:
+```bash
+flutter pub run flutter_launcher_icons:main
+```
+
+### Assets
+
+App assets are defined in `pubspec.yaml`:
+
+```yaml pubspec.yaml
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/icon.png
+    - assets/language_subjects.txt
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with 'SDK not found'">
+    Run `flutter doctor` and ensure all required SDKs are installed:
+    ```bash
+    flutter doctor -v
+    ```
+    
+    Make sure Android SDK and platform tools are properly configured.
+  </Accordion>
+
+  <Accordion title="Gradle build errors">
+    Clean and rebuild the project:
+    ```bash
+    flutter clean
+    flutter pub get
+    flutter build apk
+    ```
+  </Accordion>
+
+  <Accordion title="CocoaPods errors (iOS)">
+    Update CocoaPods and reinstall:
+    ```bash
+    cd ios
+    pod deintegrate
+    pod install
+    cd ..
+    ```
+  </Accordion>
+
+  <Accordion title="Git submodule errors">
+    Some dependencies use git repositories. Ensure git is configured:
+    ```bash
+    git config --global url."https://".insteadOf git://
+    ```
+  </Accordion>
+
+  <Accordion title="Permission errors on Android">
+    The app requires storage permissions for downloads. Ensure permissions are granted in device settings or use:
+    ```bash
+    adb shell pm grant com.oseamiya.librivoxaudiobook android.permission.WRITE_EXTERNAL_STORAGE
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Development Tools
+
+### Recommended VS Code Extensions
+
+<CardGroup cols={2}>
+  <Card title="Flutter" icon="mobile">
+    Official Flutter extension for VS Code
+  </Card>
+  <Card title="Dart" icon="code">
+    Official Dart language support
+  </Card>
+  <Card title="Bloc" icon="cubes">
+    BLoC snippets and utilities
+  </Card>
+  <Card title="Pubspec Assist" icon="box">
+    Easy package management
+  </Card>
+</CardGroup>
+
+### Debugging
+
+<Steps>
+  <Step title="Enable Debug Mode">
+    Run the app in debug mode to use DevTools:
+    ```bash
+    flutter run --debug
+    ```
+  </Step>
+
+  <Step title="Open DevTools">
+    Launch Flutter DevTools for debugging:
+    ```bash
+    flutter pub global activate devtools
+    flutter pub global run devtools
+    ```
+  </Step>
+
+  <Step title="View Logs">
+    Monitor app logs in real-time:
+    ```bash
+    flutter logs
+    ```
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### Profile Build
+
+To analyze performance, build in profile mode:
+
+```bash
+flutter run --profile
+```
+
+This enables performance profiling while maintaining near-release performance.
+
+### Analyze Code
+
+Run static analysis to find potential issues:
+
+```bash
+flutter analyze
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Understand the app architecture
+  </Card>
+  <Card title="State Management" icon="gears" href="/development/state-management">
+    Learn about BLoC and Provider patterns
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+    Start contributing to the project
+  </Card>
+</CardGroup>
